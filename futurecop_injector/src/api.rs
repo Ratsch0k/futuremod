@@ -1,11 +1,10 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::{config::get_config};
+use crate::config::get_config;
 use anyhow::anyhow;
-use futures::Future;
 use log::debug;
 use reqwest::Body;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::de::DeserializeOwned;
 use tokio::fs;
 use tokio_util::codec::{BytesCodec, FramedRead};
 

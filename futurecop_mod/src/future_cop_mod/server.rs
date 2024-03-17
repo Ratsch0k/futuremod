@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::{Path, PathBuf}, sync::{Arc, RwLock}, thread::JoinHandle, time::SystemTime};
 use anyhow::{Error, anyhow};
 use axum::{
-    body::Bytes, extract::{ws::{Message, WebSocket, WebSocketUpgrade}, BodyStream}, http::{header, HeaderMap, StatusCode}, response::{IntoResponse, Response}, routing::{get, post, put}, BoxError, Json, Router,
+    body::Bytes, extract::{ws::{Message, WebSocket, WebSocketUpgrade}, BodyStream}, http::StatusCode, response::{IntoResponse, Response}, routing::{get, post, put}, BoxError, Json, Router,
 };
+use futurecop_data::plugin::PluginInfo;
 use log::*;
 use serde::{Serialize, Deserialize};
 use tokio::{fs, io, runtime::Runtime, sync::broadcast::{self, Receiver, Sender}};
@@ -13,9 +14,9 @@ use futures::TryStreamExt;
 use tokio::{fs::File, io::BufWriter};
 use tokio_util::io::StreamReader;
 
-use crate::{config::Config, future_cop_mod::plugins::{plugin_info::{PluginInfo, PluginInfoError}, plugin_manager::PluginInstallError}};
+use crate::{config::Config, future_cop_mod::plugins::{plugin_info::{load_plugin_info, PluginInfoError}, plugin_manager::PluginInstallError}};
 
-use super::{plugins::{PluginManager, plugin_manager::PluginManagerError, plugin::Plugin}, GlobalPluginManager};
+use super::{plugins::{PluginManager, plugin_manager::PluginManagerError}, GlobalPluginManager};
 
 lazy_static! {
     pub static ref LOG_PUBLISHER: LogPublisher = LogPublisher::new();
@@ -200,16 +201,6 @@ async fn read_memory_hex(Json(payload): Json<ReadMemoryHex>) -> impl IntoRespons
     Ok(Json(memory))
 }
 
-fn with_plugin_manager<F, R>(f: F) -> Result<R, AppError>
-where F: Fn(&PluginManager) -> R {
-    match GlobalPluginManager::get().lock() {
-        Ok(plugin_manager) => {
-            Ok(f(&plugin_manager))
-        },
-        Err(e) => Err(AppError(anyhow!("could not get lock to plugin manager: {:?}", e))),
-    }
-}
-
 fn with_plugin_manager_mut<F, R>(f: F) -> Result<R, AppError>
 where F: Fn(&mut PluginManager) -> R {
     match GlobalPluginManager::get().lock() {
@@ -220,7 +211,7 @@ where F: Fn(&mut PluginManager) -> R {
     }
 }
 
-fn with_new_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error> where F: Fn(&PluginManager) -> Result<R, anyhow::Error> {
+fn with_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error> where F: Fn(&PluginManager) -> Result<R, anyhow::Error> {
     match GlobalPluginManager::get().lock() {
         Ok(mut plugin_manager) => {
             Ok(f(&mut plugin_manager)?)
@@ -230,7 +221,7 @@ fn with_new_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error> where F: Fn(&
 }
 
 async fn get_plugins() -> Result<Json<HashMap<String, futurecop_data::plugin::Plugin>>, String> {
-    with_new_plugin_manager(|plugin_manager| {
+    with_plugin_manager(|plugin_manager| {
         let plugins = plugin_manager.get_plugins();
 
         let mut plugin_response: HashMap<String, futurecop_data::plugin::Plugin> = HashMap::new();
@@ -335,7 +326,7 @@ async fn get_plugin_info(request: BodyStream) -> (StatusCode, Result<Json<Plugin
     };
 
     info!("Reading plugin information");
-    let info = match PluginInfo::from_folder(temporary_plugin_folder.clone()) {
+    let info = match load_plugin_info(temporary_plugin_folder.clone()) {
         Err(err) => match err {
             PluginInfoError::FileNotFound => return (StatusCode::BAD_REQUEST, Err("Plugin package doesn't contain a info file".to_string())),
             PluginInfoError::Format(msg) => return (StatusCode::BAD_REQUEST, Err(format!("Plugin info file has invalid format: {}", msg))),
@@ -387,7 +378,7 @@ async fn install_plugin(request: BodyStream) -> impl IntoResponse {
     };
 
     info!("Reading plugin information");
-    let info = match PluginInfo::from_folder(temporary_plugin_folder.clone()) {
+    let info = match load_plugin_info(temporary_plugin_folder.clone()) {
         Err(err) => match err {
             PluginInfoError::FileNotFound => return (StatusCode::BAD_REQUEST, "Plugin package doesn't contain a info file").into_response(),
             PluginInfoError::Format(msg) => return (StatusCode::BAD_REQUEST, format!("Plugin info file has invalid format: {}", msg)).into_response(),

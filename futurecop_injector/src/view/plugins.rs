@@ -1,10 +1,9 @@
-use std::{collections::HashMap, fmt::Display, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 use iced::{alignment::Vertical, futures::TryFutureExt, theme::Button, widget::{column, container, row, rule, scrollable, text, Space}, Alignment, Command, Length, Padding};
-use iced_aw::{modal, BootstrapIcon, Card, CardStyles};
+use iced_aw::{modal, BootstrapIcon};
 use log::{debug, info, warn};
 use rfd::FileDialog;
-use serde::{Deserialize, Serialize};
 use futurecop_data::plugin::*;
 
 use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Theme, PALETTE}, widget::{button, icon, icon_with_color, Column, Element}};

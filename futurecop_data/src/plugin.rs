@@ -1,4 +1,4 @@
-use std::{fmt::{Display, Write}, path::PathBuf};
+use std::{fmt::Display, path::PathBuf};
 
 use serde_derive::{Deserialize, Serialize};
 

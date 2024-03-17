@@ -6,7 +6,7 @@ use log::*;
 use mlua::Lua;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
-use crate::future_cop_mod::plugins::plugin_info::{load_plugin_info, PluginInfo};
+use crate::future_cop_mod::plugins::plugin_info::{load_plugin_info};
 use regex::Regex;
 use anyhow::anyhow;
 
@@ -302,7 +302,7 @@ impl PluginManager {
   /// This means, that the plugin is loaded when installing, which will execute the plugin and it's main function.
   pub fn install_plugin_from_folder(&mut self, folder: &PathBuf) -> Result<(), PluginInstallError> {
     info!("Installing plugin from {}", folder.display());
-    let plugin_info = PluginInfo::from_folder(folder.clone()).map_err(PluginInstallError::InfoFile)?;
+    let plugin_info = load_plugin_info(folder.clone()).map_err(PluginInstallError::InfoFile)?;
 
     if self.plugins.contains_key(&plugin_info.name) {
         warn!("Plugin '{}' already installed", plugin_info.name);
