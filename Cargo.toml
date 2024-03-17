@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "futurecop_mod",
+  "futurecop_injector",
+  "futurecop_data",
+]
+resolver = "2"

@@ -1,0 +1,6 @@
+name = "Test Logging"
+version = "0.0.1"
+authors = ["Simon Kurz"]
+description = "Simple plugin to test logging functionalities. Logs messages on script events."
+
+dependencies = ["dangerous", "game"]

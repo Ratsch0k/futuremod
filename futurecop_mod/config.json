@@ -1,0 +1,10 @@
+{
+    "playerOne": {
+        "sprintKey": 18,
+        "invincible": false
+    },
+    "playerTwo": {
+        "sprintKey": 110,
+        "invincible": true
+    }
+}
