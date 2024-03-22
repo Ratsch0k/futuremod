@@ -55,3 +55,10 @@ pub fn mix(a: Color, b: Color, factor: f32) -> Color {
     let mixed = a_lin.mix(b_lin, factor);
     Rgb::from_linear(mixed).into()
 }
+
+pub fn alpha(a: Color, alpha: f32) -> Color {
+    let mut a = a.clone();
+    a.a = alpha;
+
+    a
+}
