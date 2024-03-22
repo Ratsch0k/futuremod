@@ -1,4 +1,4 @@
-use std::{mem::{self, size_of_val}, sync::Arc};
+use std::{sync::Arc};
 
 use log::debug;
 use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, OwnedTable, UserData};

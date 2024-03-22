@@ -67,7 +67,7 @@ pub fn inject(config: Config) {
         ORIGINAL_PLAYER_METHOD = install_hook(0x00446800, player_method);
         ORIGINAL_DAMAGE_PLAYER = install_hook(0x00446720, damage_player_hook);
         //FIRST_MISSION_GAME_LOOP_FUNCTION = install_hook(FUN_00406a30_ADDRESS, first_mission_game_loop_function);
-        let mut hook = Hook::new(FUN_00406a30_ADDRESS);
+        let mut hook = Hook::new(FUN_00406A30_ADDRESS);
         let _ = hook.set_hook(first_mission_game_loop_function as u32).map_err(|_| warn!("Could not hook game loop"));
 
 
@@ -92,7 +92,7 @@ pub fn inject(config: Config) {
         }
     };
     let p = Arc::new(Mutex::new(plugin_manager));
-    unsafe { PLUGIN_MANAGER.set(p); }
+    unsafe { let _ = PLUGIN_MANAGER.set(p); }
 
     server::start_server(config);
 
@@ -195,9 +195,7 @@ unsafe fn player_method(param1: i32, player_entity: u32, param3: u32, param4: u3
         let game_mode_global = VolatileGlobal::<u32>::new(0x00511e03);
         let game_mode: u32;
 
-        unsafe {
-            game_mode = *game_mode_global.get();
-        }
+        game_mode = *game_mode_global.get();
         
         let mut player: Option<u8> = None;
         match (game_mode, id) {
@@ -295,7 +293,7 @@ unsafe fn damage_player_hook(player: *mut PlayerEntity, damage: i32) {
 
             id
         };
-        let second_player_exists = SECOND_PLAYER.is_some();
+        let _second_player_exists = SECOND_PLAYER.is_some();
 
         let should_negate_damage = 
             (player_id == 1 && config.player_one.invincible) ||

@@ -55,7 +55,7 @@ pub type VoidFunction = unsafe fn();
 // Function Addresses
 ///////////////////////////////////////////////////////////
 /// This is the first game function called in the main mission game loop.
-pub const FUN_00406a30_ADDRESS: u32 = 0x00406a30;
+pub const FUN_00406A30_ADDRESS: u32 = 0x00406a30;
 
 
 ///////////////////////////////////////////////////////////
@@ -219,10 +219,7 @@ impl PlayerEntity {
     /// `address` **must** point to a valid instance.
     /// Otherwise, calling this function leads to undefined behavior.
     pub fn from_address(address: u32) -> *mut PlayerEntity {
-        let player: *mut PlayerEntity;
-        unsafe {
-            player = address as *mut PlayerEntity;
-        }
+        let player = address as *mut PlayerEntity;
 
         player
     }

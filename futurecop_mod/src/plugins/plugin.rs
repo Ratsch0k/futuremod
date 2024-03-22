@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf, sync::Arc};
 use futurecop_data::plugin::{PluginError, PluginInfo};
 use log::*;
 use mlua::{OwnedFunction, Lua, Table, Function};
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde::{ser::SerializeStruct, Serialize};
 use super::{plugin_environment::PluginEnvironment};
 
 

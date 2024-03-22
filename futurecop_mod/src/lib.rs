@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::{ffi::c_void, fs, path, time::SystemTime, str::FromStr};
 use anyhow::anyhow;
 use config::Config;
