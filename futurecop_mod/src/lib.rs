@@ -4,13 +4,16 @@ use config::Config;
 use fern::Output;
 use log::Log;
 use windows::{ Win32::Foundation::*, Win32::System::SystemServices::*, Win32::System::Diagnostics::Debug::*, Win32::System::Threading::*, core::{s, PCSTR}};
-mod future_cop;
+mod futurecop;
 mod config;
+mod entry;
+mod server;
+mod plugins;
+mod util;
 
 #[macro_use]
 extern crate lazy_static;
 
-mod future_cop_mod;
 
 static mut IS_ATTACHED: bool = false;
 
@@ -97,7 +100,7 @@ unsafe extern "system" fn main(_: *mut c_void) -> u32 {
         _ => (),
     }
     
-    future_cop_mod::inject(config);
+    entry::inject(config);
 
     return 0;
 }
@@ -127,7 +130,7 @@ fn setup_logging(level: &str) -> Result<(), fern::InitError> {
             .format(|out, message, _record| {
                 out.finish(format_args!("{}", message))
             })
-            .chain(Box::new(&*future_cop_mod::server::LOG_PUBLISHER) as Box<dyn Log>)
+            .chain(Box::new(&*server::LOG_PUBLISHER) as Box<dyn Log>)
         ).apply()?;
 
     Ok(())

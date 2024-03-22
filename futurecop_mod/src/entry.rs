@@ -3,13 +3,11 @@ use std::{cell::OnceCell, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, tim
 use log::*;
 use num;
 use windows::{Win32::System::Diagnostics::Debug::OutputDebugStringA, core::{PCSTR, s}, Win32::UI::Input::KeyboardAndMouse::*};
-use crate::{future_cop::*, config::Config};
-use crate::future_cop::global::*;
-mod util;
-use util::install_hook;
-pub mod server;
-mod plugins;
-use self::{plugins::PluginManager, util::Hook};
+use crate::{futurecop::*, config::Config};
+use crate::futurecop::global::*;
+use crate::util::install_hook;
+use crate::{plugins::PluginManager, util::Hook};
+use crate::server;
 use anyhow::anyhow;
 
 
@@ -26,7 +24,7 @@ static mut FIRST_MISSION_GAME_LOOP_FUNCTION: Option<VoidFunction> = None;
 
 static mut PLUGIN_MANAGER: OnceCell<Arc<Mutex<PluginManager>>> = OnceCell::new();
 
-struct GlobalPluginManager;
+pub struct GlobalPluginManager;
 
 impl GlobalPluginManager {
     pub fn get() -> Arc<Mutex<PluginManager>> {

@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use serde::Serialize;
 
-use crate::future_cop::*;
+use crate::futurecop::*;
 
 pub trait GetterSetter<T> {
     fn get(&self) -> &T;

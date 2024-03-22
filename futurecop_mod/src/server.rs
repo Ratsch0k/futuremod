@@ -14,9 +14,9 @@ use futures::TryStreamExt;
 use tokio::{fs::File, io::BufWriter};
 use tokio_util::io::StreamReader;
 
-use crate::{config::Config, future_cop_mod::plugins::{plugin_info::{load_plugin_info, PluginInfoError}, plugin_manager::PluginInstallError}};
+use crate::{config::Config, plugins::{plugin_info::{load_plugin_info, PluginInfoError}, plugin_manager::PluginInstallError}};
 
-use super::{plugins::{PluginManager, plugin_manager::PluginManagerError}, GlobalPluginManager};
+use super::{plugins::{PluginManager, plugin_manager::PluginManagerError}, entry::GlobalPluginManager};
 
 lazy_static! {
     pub static ref LOG_PUBLISHER: LogPublisher = LogPublisher::new();

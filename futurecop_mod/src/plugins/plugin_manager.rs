@@ -6,7 +6,7 @@ use log::*;
 use mlua::Lua;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
-use crate::future_cop_mod::plugins::plugin_info::{load_plugin_info};
+use crate::plugins::plugin_info::{load_plugin_info};
 use regex::Regex;
 use anyhow::anyhow;
 

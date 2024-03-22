@@ -4,7 +4,7 @@ use log::debug;
 use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, OwnedTable, UserData};
 use serde::Serialize;
 
-use crate::future_cop::{self, global::GetterSetter, state::FUTURE_COP, PLAYER_ARRAY_ADDR};
+use crate::futurecop::{self, global::GetterSetter, state::FUTURE_COP, PLAYER_ARRAY_ADDR};
 
 #[derive(Debug, Clone, Serialize)]
 enum GameMode {
@@ -21,11 +21,11 @@ impl From<u32> for GameMode {
     }
 }
 
-impl From<&future_cop::GameMode> for GameMode {
-    fn from(value: &future_cop::GameMode) -> Self {
+impl From<&futurecop::GameMode> for GameMode {
+    fn from(value: &futurecop::GameMode) -> Self {
       match value {
-        future_cop::GameMode::CrimeWar => GameMode::CrimeWar,
-        future_cop::GameMode::PrecinctAssault => GameMode::PrecinctAssault,
+        futurecop::GameMode::CrimeWar => GameMode::CrimeWar,
+        futurecop::GameMode::PrecinctAssault => GameMode::PrecinctAssault,
       }
     }
 }
@@ -43,7 +43,7 @@ struct GameState {
 
 #[derive(Debug)]
 struct PlayerEntity {
-  player_entity: *mut future_cop::PlayerEntity
+  player_entity: *mut futurecop::PlayerEntity
 }
 
 impl UserData for PlayerEntity {
@@ -113,7 +113,7 @@ impl UserData for PlayerEntity {
         Ok(())
       });
 
-      fn create_getter_setter<'lua, T, F>(name: &str, fields: &mut F, extractor: fn(*mut future_cop::PlayerEntity) -> *mut T)
+      fn create_getter_setter<'lua, T, F>(name: &str, fields: &mut F, extractor: fn(*mut futurecop::PlayerEntity) -> *mut T)
       where
         F: mlua::prelude::LuaUserDataFields<'lua, PlayerEntity>,
         T: IntoLua<'lua> + FromLua<'lua> + 'static + Copy,  {
@@ -134,7 +134,7 @@ impl UserData for PlayerEntity {
       }
 
 
-      fn get_enemies_killed(player: *mut future_cop::PlayerEntity) -> *mut u16 {
+      fn get_enemies_killed(player: *mut futurecop::PlayerEntity) -> *mut u16 {
         unsafe {&mut (*(*player).player).enemies_killed}
       }
 
@@ -212,7 +212,7 @@ pub fn create_game_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
       return Err(mlua::Error::RuntimeError("Player doesn't exist".into()));
     }
 
-    let player_entity = future_cop::PlayerEntity::from_address(player_array_item);
+    let player_entity = futurecop::PlayerEntity::from_address(player_array_item);
 
     Ok(PlayerEntity {player_entity})
   })?;
