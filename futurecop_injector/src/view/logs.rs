@@ -185,10 +185,10 @@ fn level_picker<'a>(log_levels: &SelectedLogLevels) -> Element<'a, Message> {
             (checkbox("Warn", log_levels.warn).on_toggle(Message::ToggleLevelWarn).width(Length::Fill))
             (checkbox("Error", log_levels.error).on_toggle(Message::ToggleLevelError).width(Length::Fill))
           ))
-          .spacing(5.0)
+          .spacing(8.0)
           .width(140.0)
         }
       )
   )
-  .padding(4.0).into()
+  .into()
 }

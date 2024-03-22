@@ -1,5 +1,5 @@
 use iced::{advanced::widget::text, application::StyleSheet, border::Radius, color, overlay::menu::{self}, theme::{self, Checkbox, Menu, Palette, PickList}, widget::{button, checkbox, container, pick_list, rule, scrollable}, Border, Color, Shadow, Vector};
-use iced_aw::{style::{card, modal}, CardStyles, ModalStyles};
+use iced_aw::{style::{card, modal, MenuBarStyle}, CardStyles, ModalStyles};
 
 use crate::util::{self, darken};
 
@@ -276,6 +276,15 @@ impl iced_aw::menu::StyleSheet for Theme {
     type Style = iced_aw::style::MenuBarStyle;
 
     fn appearance(&self, style: &Self::Style) -> iced_aw::menu::Appearance {
-        iced_aw::menu::StyleSheet::appearance(&self.0, style)
+      let palette = self.0.extended_palette();
+
+      match style {
+        MenuBarStyle::Default => iced_aw::menu::Appearance {
+          menu_background: util::lighten(palette.background.base.color, 0.05).into(),
+          bar_background: Color::from_rgba(0.0, 0.0, 0.0, 0.0).into(),
+            ..Default::default()
+        },
+        _ => iced_aw::menu::StyleSheet::appearance(&self.0, style),
+      }
     }
 }
