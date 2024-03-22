@@ -1,4 +1,4 @@
-use iced::{advanced::widget::text, application::StyleSheet, border::Radius, color, theme::{self, Checkbox, Palette}, widget::{button, checkbox, container, rule, scrollable}, Border, Color, Shadow, Vector};
+use iced::{advanced::widget::text, application::StyleSheet, border::Radius, color, overlay::menu::{self}, theme::{self, Checkbox, Menu, Palette, PickList}, widget::{button, checkbox, container, pick_list, rule, scrollable}, Border, Color, Shadow, Vector};
 use iced_aw::{style::{card, modal}, CardStyles, ModalStyles};
 
 use crate::util::{self, darken};
@@ -249,5 +249,33 @@ impl checkbox::StyleSheet for Theme {
 
     fn hovered(&self, style: &Self::Style, is_checked: bool) -> checkbox::Appearance {
         self.0.hovered(style, is_checked)
+    }
+}
+
+impl pick_list::StyleSheet for Theme {
+  type Style = PickList;
+  
+  fn active(&self, style: &<Self as pick_list::StyleSheet>::Style) -> pick_list::Appearance {
+      self.0.active(style)
+    }
+  
+  fn hovered(&self, style: &<Self as pick_list::StyleSheet>::Style) -> pick_list::Appearance {
+      self.0.hovered(style)
+    }
+}
+
+impl menu::StyleSheet for Theme {
+  type Style = Menu;
+
+  fn appearance(&self, style: &Self::Style) -> menu::Appearance {
+      menu::StyleSheet::appearance(&self.0, style)
+  }
+}
+
+impl iced_aw::menu::StyleSheet for Theme {
+    type Style = iced_aw::style::MenuBarStyle;
+
+    fn appearance(&self, style: &Self::Style) -> iced_aw::menu::Appearance {
+        iced_aw::menu::StyleSheet::appearance(&self.0, style)
     }
 }

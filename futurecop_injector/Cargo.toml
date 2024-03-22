@@ -14,8 +14,8 @@ fern = {version = "0.6.2", features = ["colored"]}
 futurecop_data = { version = "0.1.0", path = "../futurecop_data" }
 futures = "0.3.30"
 humantime = "2.1.0"
-iced = {version = "0.12.1", features = ["tokio"]}
-iced_aw = {version = "0.8.0", features = ["icons", "modal", "card"]}
+iced = {version = "0.12.0", features = ["tokio"]}
+iced_aw = {version = "0.8.0", features = ["icons", "modal", "card", "menu"]}
 lazy_static = "1.4.0"
 log = "0.4.20"
 palette = "0.7.5"
