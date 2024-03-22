@@ -1,4 +1,4 @@
-use iced::{advanced::widget::text, application::StyleSheet, border::Radius, color, theme::{self, Checkbox, Palette}, widget::{button, checkbox, container, rule, scrollable}, Border, Color, Shadow};
+use iced::{advanced::widget::text, application::StyleSheet, border::Radius, color, theme::{self, Checkbox, Palette}, widget::{button, checkbox, container, rule, scrollable}, Border, Color, Shadow, Vector};
 use iced_aw::{style::{card, modal}, CardStyles, ModalStyles};
 
 use crate::util::{self, darken};
@@ -80,6 +80,7 @@ pub enum Container {
   Box,
   Error,
   Warning,
+  Dialog,
   Custom(Box<dyn iced::widget::container::StyleSheet<Style = Theme>>),
 }
 
@@ -89,16 +90,30 @@ impl container::StyleSheet for Theme {
     fn appearance(&self, style: &Self::Style) -> container::Appearance {
         match style {
             Container::Transparent => container::Appearance::default(),
+            Container::Dialog => {
+                let palette = self.0.extended_palette();
+
+                container::Appearance {
+                    text_color: None,
+                    background: Some(util::lighten(palette.background.base.color, 0.05).into()),
+                    border: Border::with_radius(12),
+                    shadow: Shadow {
+                      color: util::alpha(util::darken(palette.background.base.color, 0.2), 0.5),
+                      offset: Vector::new(0.0, -8.0),
+                      blur_radius: 48.0,
+                    },
+                }
+            },
             Container::Box => {
                 let palette = self.0.extended_palette();
 
                 container::Appearance {
                     text_color: None,
-                    background: Some(palette.background.strong.color.into()),
-                    border: Border::with_radius(2),
+                    background: Some(util::lighten(palette.background.base.color, 0.05).into()),
+                    border: Border::with_radius(12),
                     shadow: Shadow::default(),
                 }
-            }
+            },
             Container::Custom(custom) => custom.appearance(self),
             Container::Error => {
               let palette = self.0.palette();

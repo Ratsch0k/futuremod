@@ -311,7 +311,8 @@ impl Plugins {
               Some(
                 container(
                   column![
-                  text("Confirm installation"),
+                  text("Confirm installation").size(24.0),
+                  Space::with_height(12.0),
                   scrollable(
                     Column::new()
                       .push(text(format!("Are you sure you want to install the plugin '{}'.", confirmation_prompt.plugin.name.clone())))
@@ -340,15 +341,15 @@ impl Plugins {
                   ),
                   row![
                     Space::with_width(Length::Fill),
-                    button(text("Install")).on_press(Message::ConfirmInstallation(confirmation_prompt.clone())),
                     button(text("Cancel")).style(Button::Destructive).on_press(Message::CancelInstallation),
+                    button(text("Install")).on_press(Message::ConfirmInstallation(confirmation_prompt.clone())),
                   ]
                   .align_items(Alignment::End)
                   .spacing(8.0)
                   .width(Length::Fill)
                   ])
                   .max_width(500.0)
-                  .style(Container::Box)
+                  .style(Container::Dialog)
                   .padding(16.0)
               )
             } else {
