@@ -345,7 +345,7 @@ async fn get_plugin_info(request: BodyStream) -> (StatusCode, Result<Json<Plugin
 }
 
 
-async fn install_plugin(request: BodyStream) -> impl IntoResponse {
+async fn install_plugin(request: BodyStream) -> (StatusCode, Result<(), String>) {
     info!("Installing new plugin");
 
     let random_file_name: String = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
@@ -355,7 +355,7 @@ async fn install_plugin(request: BodyStream) -> impl IntoResponse {
     let fcop_temp_folder = Path::new(&std::env::temp_dir()).join(PathBuf::from(TEMPORARY_DIRECTORY));
     if !fcop_temp_folder.exists() {
         if let Err(err) = fs::create_dir(&fcop_temp_folder).await {
-            return (StatusCode::INTERNAL_SERVER_ERROR, format!("Could not create temporary directory for fcop mod: {}", err.to_string())).into_response();
+            return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Could not create temporary directory for fcop mod: {}", err.to_string())));
         }
     }
 
@@ -363,7 +363,7 @@ async fn install_plugin(request: BodyStream) -> impl IntoResponse {
     debug!("Storing incoming plugin package in temporary file: {}", temporary_file_path.to_str().unwrap_or("unknown"));
 
     match write_to_temp_file(&temporary_file_path, request).await {
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("{:?}", e))),
         _ => (),
     };
     debug!("Wrote plugin file into temporary file");
@@ -371,8 +371,8 @@ async fn install_plugin(request: BodyStream) -> impl IntoResponse {
     info!("Extracting plugin package");
     let temporary_plugin_folder = match extract_temp_file(&temporary_file_path).await {
         Err(e) => match e {
-            InstallError::ExtractionError(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("Error while extracting the plugin package: {}", msg)).into_response(),
-            InstallError::Other(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+            InstallError::ExtractionError(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Error while extracting the plugin package: {}", msg))),
+            InstallError::Other(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(msg)),
         },
         Ok(v) => v,
     };
@@ -380,9 +380,9 @@ async fn install_plugin(request: BodyStream) -> impl IntoResponse {
     info!("Reading plugin information");
     let info = match load_plugin_info(temporary_plugin_folder.clone()) {
         Err(err) => match err {
-            PluginInfoError::FileNotFound => return (StatusCode::BAD_REQUEST, "Plugin package doesn't contain a info file").into_response(),
-            PluginInfoError::Format(msg) => return (StatusCode::BAD_REQUEST, format!("Plugin info file has invalid format: {}", msg)).into_response(),
-            PluginInfoError::Other(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("Unexpected error while reading the plugin's info file: {}", msg)).into_response(),
+            PluginInfoError::FileNotFound => return (StatusCode::BAD_REQUEST, Err("Plugin package doesn't contain a info file".to_string())),
+            PluginInfoError::Format(msg) => return (StatusCode::BAD_REQUEST, Err(format!("Plugin info file has invalid format: {}", msg))),
+            PluginInfoError::Other(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Unexpected error while reading the plugin's info file: {}", msg))),
         },
         Ok(v) => v,
     };
@@ -394,16 +394,16 @@ async fn install_plugin(request: BodyStream) -> impl IntoResponse {
         plugin_manager.install_plugin_from_folder(&temporary_plugin_folder)
     }) {
         Ok(result) => match result {
-            Ok(()) => StatusCode::OK.into_response(),
+            Ok(()) => (StatusCode::OK, Ok(())),
             Err(err) => match err {
-                PluginInstallError::AlreadyInstalled => (StatusCode::BAD_REQUEST, "plugin is already installed").into_response(),
-                PluginInstallError::InvalidName => (StatusCode::BAD_REQUEST, "plugin has an invalid name").into_response(),
-                PluginInstallError::InfoFile(e) => (StatusCode::BAD_REQUEST, format!("plugin package info error: {:?}", e)).into_response(),
-                PluginInstallError::Plugin(e) => (StatusCode::BAD_REQUEST, format!("Plugin was installed but immediately errored: {:?}", e)).into_response(),
-                _ => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error while installing plugin: {:?}", err)).into_response(),
+                PluginInstallError::AlreadyInstalled => (StatusCode::BAD_REQUEST, Err("plugin is already installed".to_string())),
+                PluginInstallError::InvalidName => (StatusCode::BAD_REQUEST, Err("plugin has an invalid name".to_string())),
+                PluginInstallError::InfoFile(e) => (StatusCode::BAD_REQUEST, Err(format!("plugin package info error: {:?}", e))),
+                PluginInstallError::Plugin(e) => (StatusCode::BAD_REQUEST, Err(format!("Plugin was installed but immediately errored: {:?}", e))),
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Error while installing plugin: {:?}", err))),
             }
         }
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error while installing plugin: {:?}", err)).into_response(),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Error while installing plugin: {:?}", err))),
     }
 }
 
