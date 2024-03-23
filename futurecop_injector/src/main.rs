@@ -78,7 +78,7 @@ fn main() -> iced::Result {
     gui::ModInjector::run(
         Settings {
             window: window::Settings {
-                size: Size::new(800.0, 600.0),
+                size: Size::new(1024.0, 800.0),
                 ..window::Settings::default()
             },
             ..Settings::default()
