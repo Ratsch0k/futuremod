@@ -1,7 +1,7 @@
 use iced::{widget::{column, text}, Alignment, Command, Length};
 use log::debug;
 
-use crate::{config::get_config, log_subscriber::{self, LogRecord}, widget::{button, Element}};
+use crate::{config::get_config, log_subscriber::{self, LogRecord}, theme::Button, widget::{button, Element}};
 
 use super::{logs, plugins};
 
@@ -116,8 +116,8 @@ impl Main {
                 column![
                     text("FutureCop Mod").size(24),
                     column![
-                        button("Logs").on_press(Message::ToLogs),
-                        button("Plugins").on_press(Message::ToPlugins)
+                        button("Logs").on_press(Message::ToLogs).style(Button::Primary),
+                        button("Plugins").on_press(Message::ToPlugins).style(Button::Primary)
                     ].spacing(4)
                 ]
                 .width(Length::Fill)

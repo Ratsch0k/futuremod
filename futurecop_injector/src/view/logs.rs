@@ -1,6 +1,7 @@
-use iced::{theme::Button, widget::{checkbox, column, container, row, scrollable::{Alignment, Direction, Properties, Scrollable}, text}, Command, Length};
+use iced::{widget::{checkbox, column, container, row, scrollable::{Alignment, Direction, Properties, Scrollable}, text}, Command, Length};
 use iced_aw::{menu::{Item, Menu}, menu_bar, menu_items, BootstrapIcon};
 
+use crate::theme::Button;
 use crate::{log_subscriber::LogRecord, theme, view::main::LogState, widget::{button, icon, Element}};
 
 use super::main;
@@ -173,7 +174,7 @@ fn header<'a>(unlimited_history: bool, selected_levels: &SelectedLogLevels) -> E
 }
 
 fn level_picker<'a>(log_levels: &SelectedLogLevels) -> Element<'a, Message> {
-  let filter_button = button("Filter").on_press(Message::None);
+  let filter_button = button("Filter").on_press(Message::None).style(Button::Text);
 
   menu_bar!(
       (

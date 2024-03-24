@@ -1337,6 +1337,7 @@ dependencies = [
  "iced_aw",
  "lazy_static",
  "log",
+ "once_cell",
  "palette",
  "reqwest",
  "rfd",

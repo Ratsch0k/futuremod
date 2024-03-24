@@ -14,6 +14,7 @@ mod log_subscriber;
 mod theme;
 mod widget;
 mod util;
+mod palette;
 
 
 #[derive(Parser)]

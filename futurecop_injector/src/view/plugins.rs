@@ -1,12 +1,13 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use iced::{alignment::Vertical, futures::TryFutureExt, theme::Button, widget::{column, container, row, rule, scrollable, text, Space}, Alignment, Command, Length, Padding};
+use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, container, row, rule, scrollable, text, Space}, Alignment, Command, Length, Padding};
 use iced_aw::{modal, BootstrapIcon};
 use log::{debug, info, warn};
 use rfd::FileDialog;
 use futurecop_data::plugin::*;
 
-use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Theme, PALETTE}, widget::{button, icon, icon_with_color, Column, Element}};
+use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, widget::{button, icon, icon_with_color, icon_with_style, Column, Element}};
+use crate::theme::Button;
 
 #[derive(Debug, Clone)]
 pub struct PluginsView {
@@ -268,7 +269,7 @@ impl Plugins {
                 row![
                   button(icon(iced_aw::BootstrapIcon::ArrowLeft)).style(Button::Text).on_press(Message::GoBack),
                   container(text("Plugins").size(24).vertical_alignment(Vertical::Center)).width(Length::Fill).align_y(Vertical::Center),
-                  button("Install Plugin").on_press(Message::SelectPluginToInstall)
+                  button("Install Plugin").on_press(Message::SelectPluginToInstall).style(Button::Primary)
                 ]
                   .spacing(16)
                   .align_items(iced::Alignment::Center),
@@ -281,11 +282,11 @@ impl Plugins {
                     container(
                       row![
                         text(err).width(Length::Fill),
-                        button(icon_with_color(BootstrapIcon::X, PALETTE.danger)).on_press(Message::ClearError).style(Button::Text)
+                        button(icon_with_style(BootstrapIcon::X, Text::Danger)).on_press(Message::ClearError).style(Button::Text)
                       ].align_items(iced::Alignment::Center),
                     )
                     .padding(16)
-                    .style(Container::Error)
+                    .style(Container::Danger)
                   )
                   .padding(16)
               )
@@ -342,7 +343,7 @@ impl Plugins {
                   row![
                     Space::with_width(Length::Fill),
                     button(text("Cancel")).style(Button::Destructive).on_press(Message::CancelInstallation),
-                    button(text("Install")).on_press(Message::ConfirmInstallation(confirmation_prompt.clone())),
+                    button(text("Install")).on_press(Message::ConfirmInstallation(confirmation_prompt.clone())).style(Button::Primary),
                   ]
                   .align_items(Alignment::End)
                   .spacing(8.0)
@@ -369,7 +370,7 @@ fn plugin_component<'a>(name: &String, plugin: &Plugin) -> Element<'a, Message> 
   container(
     row![
       Column::new()
-        .push(text(name))
+        .push(text(name).size(20))
         .push(plugin_state_component(plugin))
         .width(Length::Fill),
       row![
@@ -377,7 +378,10 @@ fn plugin_component<'a>(name: &String, plugin: &Plugin) -> Element<'a, Message> 
         plugin_toggle_button(plugin),
       ].spacing(8),
     ]
+    .align_items(Alignment::Center)
   )
+  .style(Container::Box)
+  .padding(16)
   .into()
 }
 
@@ -402,13 +406,14 @@ fn plugin_state_component<'a>(plugin: &Plugin) -> Element<'a, Message> {
 fn plugin_go_to_details_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
   button(text("Details"))
     .on_press(Message::GoToDetails(plugin.info.name.clone()))
+    .style(Button::Default)
     .into()
 }
 
 fn plugin_toggle_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
   let mut button = match plugin.enabled {
-    true => button(text("Disable")).on_press(Message::Disable(plugin.info.name.clone())),
-    false => button(text("Enable")).on_press(Message::Enable(plugin.info.name.clone()))
+    true => button(text("Disable")).on_press(Message::Disable(plugin.info.name.clone())).style(Button::Destructive),
+    false => button(text("Enable")).on_press(Message::Enable(plugin.info.name.clone())).style(Button::Positive)
   };
 
   if let PluginState::Error(_) = plugin.state {
@@ -421,6 +426,7 @@ fn plugin_toggle_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
 fn plugin_reload_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
   button(text("Reload"))
     .on_press(Message::Reload(plugin.info.name.clone()))
+    .style(Button::Primary)
     .into()
 }
 
@@ -458,8 +464,8 @@ fn plugin_details_view<'a>(plugin: &Plugin) -> Element<'a, Message> {
       text(format!("by {}", plugin.info.authors.join(", "))),
     ].spacing(8).padding([0, 0, 16, 0]),
     row![
-      plugin_toggle_button(plugin),
       plugin_reload_button(plugin),
+      plugin_toggle_button(plugin),
       plugin_uninstall_button(plugin)
     ].spacing(8).padding([0, 0, 8, 0]),
     plugin_details_state(plugin),

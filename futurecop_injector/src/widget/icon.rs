@@ -24,3 +24,7 @@ pub fn align_icon<'a, Message>(content: impl Into<Element<'a, Message, theme::Th
 pub fn icon_with_color<'a, Message>(content: BootstrapIcon, color: Color) -> Container<'a, Message, theme::Theme> {
   align_icon(icon_text(content).style(theme::Text::Color(color)))
 }
+
+pub fn icon_with_style<'a, Message>(content: BootstrapIcon, style: theme::Text) -> Container<'a, Message, theme::Theme> {
+  align_icon(icon_text(content).style(style))
+}

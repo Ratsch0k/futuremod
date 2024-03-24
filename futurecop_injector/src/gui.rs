@@ -1,8 +1,8 @@
-use iced::{executor, font, Application, Command, Subscription, Theme};
+use iced::{executor, font, Application, Command, Subscription};
 use log::debug;
 
+use crate::palette::Palette;
 use crate::{theme, widget::Element};
-use crate::theme::PALETTE;
 
 use super::view::{main, loading};
 
@@ -44,10 +44,7 @@ impl Application for ModInjector {
     }
 
     fn theme(&self) -> Self::Theme {
-        theme::Theme(Theme::custom(
-            "Custom".into(),
-            PALETTE,
-        ))
+        theme::Theme::new(Palette::default())
     }
 
     fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
