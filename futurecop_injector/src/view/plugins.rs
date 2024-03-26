@@ -1,12 +1,12 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, container, row, rule, scrollable, text, Space}, Alignment, Command, Length, Padding};
+use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, container, row, rule, scrollable, text, Space, Toggler}, Alignment, Command, Length, Padding};
 use iced_aw::{modal, BootstrapIcon};
 use log::{debug, info, warn};
 use rfd::FileDialog;
 use futurecop_data::plugin::*;
 
-use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, widget::{button, icon, icon_with_color, icon_with_style, Column, Element}};
+use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, widget::{button, icon, icon_with_style, Column, Element, Row}};
 use crate::theme::Button;
 
 #[derive(Debug, Clone)]
@@ -255,7 +255,7 @@ impl Plugins {
             let mut list = Column::new();
 
             for (name, plugin) in plugin_view.plugins.iter() {
-              list = list.push(plugin_component(name, plugin));
+              list = list.push(plugin_card(name, plugin));
             }
 
             list = list
@@ -366,17 +366,18 @@ impl Plugins {
   }
 }
 
-fn plugin_component<'a>(name: &String, plugin: &Plugin) -> Element<'a, Message> {
+fn plugin_card<'a>(name: &String, plugin: &Plugin) -> Element<'a, Message> {
   container(
     row![
       Column::new()
         .push(text(name).size(20))
         .push(plugin_state_component(plugin))
         .width(Length::Fill),
-      row![
-        plugin_go_to_details_button(plugin),
-        plugin_toggle_button(plugin),
-      ].spacing(8),
+      Row::new()
+      .push(plugin_go_to_details_button(plugin))
+      .push_maybe(plugin_toggle_button(plugin))
+      .spacing(8)
+      .align_items(Alignment::Center)
     ]
     .align_items(Alignment::Center)
   )
@@ -410,17 +411,31 @@ fn plugin_go_to_details_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
     .into()
 }
 
-fn plugin_toggle_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
-  let mut button = match plugin.enabled {
-    true => button(text("Disable")).on_press(Message::Disable(plugin.info.name.clone())).style(Button::Destructive),
-    false => button(text("Enable")).on_press(Message::Enable(plugin.info.name.clone())).style(Button::Positive)
-  };
-
+fn plugin_toggle_button<'a>(plugin: &Plugin) -> Option<Element<'a, Message>> {
   if let PluginState::Error(_) = plugin.state {
-    button = button.on_press_maybe(None);
+    return None;
   }
 
-  button.into()
+  let label = match plugin.enabled {
+    true => "Enabled",
+    false => "Disabled",
+  };
+
+  let plugin_name = plugin.info.name.clone();
+  let enabled = plugin.enabled;
+
+  Some(
+    container(
+      Toggler::new(
+        String::from(label),
+        enabled, 
+        move |state| match state {
+          true => Message::Enable(plugin_name.clone()),
+          false => Message::Disable(plugin_name.clone()),
+        }
+    ).width(120)
+  ).into()
+  )
 }
 
 fn plugin_reload_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
@@ -463,17 +478,31 @@ fn plugin_details_view<'a>(plugin: &Plugin) -> Element<'a, Message> {
       text(plugin.info.version.clone()),
       text(format!("by {}", plugin.info.authors.join(", "))),
     ].spacing(8).padding([0, 0, 16, 0]),
-    row![
-      plugin_reload_button(plugin),
-      plugin_toggle_button(plugin),
-      plugin_uninstall_button(plugin)
-    ].spacing(8).padding([0, 0, 8, 0]),
+    Row::new()
+      .push(plugin_reload_button(plugin))
+      .push_maybe(plugin_toggle_button(plugin))
+      .push(plugin_uninstall_button(plugin))
+      .spacing(8)
+      .padding([0, 0, 8, 0])
+      .align_items(Alignment::Center),
     plugin_details_state(plugin),
     container(rule::Rule::horizontal(1.0)).padding([8.0, 0.0, 8.0, 0.0]),
     plugin_details_content(plugin),
   ]
   .padding(8)
   .into()
+}
+
+fn plugin_description<'a>(description: String) -> Element<'a, Message> {
+  let lines: Vec<Element<'a, Message>> = description
+    .replace("\r\n", "\n")
+    .split("\n")
+    .map(|line| Into::<Element<'a, Message>>::into(text(line)))
+    .collect();
+
+  Column::from_vec(Vec::from_iter(lines))
+    .spacing(6.0)
+    .into()
 }
 
 fn plugin_details_content<'a>(plugin: &Plugin) -> Element<'a, Message> {
@@ -486,7 +515,7 @@ fn plugin_details_content<'a>(plugin: &Plugin) -> Element<'a, Message> {
   column![
     column![
       text("Description").size(24),
-      text(description),
+      plugin_description(description),
     ].spacing(8.0),
 
     column![

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use iced::{advanced::widget::text, application::StyleSheet, border::Radius, color, overlay::menu, theme::{self, palette::Pair, Checkbox, Menu, Palette, PickList}, widget::{button, checkbox, container, pick_list, rule, scrollable}, Background, Border, Color, Shadow, Vector};
+use iced::{advanced::widget::text, application::StyleSheet, border::Radius, color, overlay::menu, theme::{self, palette::Pair, Checkbox, Menu, PickList, Toggler}, widget::{button, checkbox, container, pick_list, rule, scrollable, toggler}, Background, Border, Color, Shadow, Vector};
 use iced_aw::{style::{card, modal, MenuBarStyle}, CardStyles, ModalStyles};
 
 use crate::{palette::ColorRange, util};
@@ -349,5 +349,17 @@ impl iced_aw::menu::StyleSheet for Theme {
         },
         _ => iced_aw::menu::StyleSheet::appearance(&self.theme, style),
       }
+    }
+}
+
+impl toggler::StyleSheet for Theme {
+    type Style = Toggler;
+
+    fn active(&self, style: &Self::Style, is_active: bool) -> toggler::Appearance {
+        self.theme.active(style, is_active)
+    }
+
+    fn hovered(&self, style: &Self::Style, is_active: bool) -> toggler::Appearance {
+        self.theme.hovered(style, is_active)
     }
 }

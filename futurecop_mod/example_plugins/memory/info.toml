@@ -2,11 +2,11 @@ name = "Memory Example"
 version = "0.0.1"
 authors = ["Simon Kurz"]
 description = """\
-  Example plugin to show how the dangerous API can \
-  be used to read and write memory.\
+Example plugin to show how the dangerous API can \
+be used to read and write memory.
 
-  This plugin uses the dangerous API to manually read the player array,\
-  get the first player, and refills their ammo.
-  """
+This plugin uses the dangerous API to manually read the player array, \
+get the first player, and refill their ammo.\
+"""
 
 dependencies = ["dangerous"]

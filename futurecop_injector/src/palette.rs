@@ -1,4 +1,4 @@
-use iced::{color, theme::palette::{Danger, Pair, Primary, Secondary, Success}, Color};
+use iced::{color, theme::palette::{Pair, Primary, Secondary, Success}, Color};
 
 
 pub const BACKGROUND: Color = color!(0x13111F);
