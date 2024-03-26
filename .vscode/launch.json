@@ -4,48 +4,11 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-    {
-        "type": "lldb",
-        "request": "attach",
-        "name": "Attach",
-        "program": "futurecop-mod-injector.exe"
-    },
         {
             "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'futurecop-mod-injector'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=futurecop-mod-injector",
-                    "--package=futurecop-mod-injector"
-                ],
-                "filter": {
-                    "name": "futurecop-mod-injector",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
+            "request": "attach",
+            "name": "Attach",
+            "program": "FCopLAPD.exe"
         },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'futurecop-mod-injector'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=futurecop-mod-injector",
-                    "--package=futurecop-mod-injector"
-                ],
-                "filter": {
-                    "name": "futurecop-mod-injector",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        }
     ]
 }
