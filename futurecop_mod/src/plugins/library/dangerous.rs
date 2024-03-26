@@ -12,6 +12,8 @@ use crate::util::Hook;
 enum Type {
   String,
   Integer,
+  Byte,
+  Short,
   Float,
   Void,
 }
@@ -23,6 +25,8 @@ impl Type {
       "int" => Type::Integer,
       "float" => Type::Float,
       "void" => Type::Void,
+      "short" => Type::Short,
+      "byte" => Type::Byte,
       _ => return None,
     };
 
@@ -53,6 +57,8 @@ unsafe fn raw_to_lua<'a>(lua: &'a Lua, lua_type: Type, raw_value: u32) -> Result
     },
     Type::Float => mlua::Value::Number(f64::from(raw_value as f32)),
     Type::Void => mlua::Value::Nil,
+    Type::Short => mlua::Value::Integer(Into::<i32>::into(raw_value as i16)),
+    Type::Byte => mlua::Value::Integer(Into::<i32>::into(raw_value as i8))
   };
 
   Ok(value)
@@ -74,6 +80,14 @@ unsafe fn lua_to_raw<'a>(lua_type: Type, lua_value: &'a mlua::Value) -> Result<V
         vec![value.as_ptr() as u32]
       },
       None => bail!("value is not a string"),
+    },
+    Type::Byte => match lua_value.as_u32() {
+      Some(value) => vec![value],
+      None => bail!("value is not a number")
+    },
+    Type::Short => match lua_value.as_u32() {
+      Some(value) => vec![value],
+      None => bail!("value is not a number"),
     }
   };
 
@@ -240,5 +254,94 @@ pub fn create_dangerous_library(lua: Arc<Lua>) -> Result<mlua::OwnedTable, mlua:
   
   table.set("hook", hook_fn)?;
 
+  let write_fn = lua.create_function(write_memory_function)?;
+  table.set("writeMemory", write_fn)?;
+
+  let read_fn = lua.create_function(read_memory_function)?;
+  table.set("readMemory", read_fn)?;
+
   Ok(table.into_owned())
+}
+
+/// Lua function to write arbitrary to a arbitrary memory address.
+/// 
+/// **Very unsafe**.
+/// 
+/// Wrong usage can easily lead to a panic.
+fn write_memory_function<'lua>(_: &'lua Lua, (address, byte_array): (u32, mlua::Table)) -> Result<(), mlua::Error> {
+  debug!("Write memory to {}, value: {:?}", address, byte_array);
+
+  // Verify that the byte list if valid, before doing any unsafe operations
+  let mut bytes: Vec<u8> = Vec::new();
+
+  // Lua array start with index 1
+  let mut index = 1;
+
+  while byte_array.contains_key(index)? {
+    let value: mlua::Value = byte_array.get(index)?;
+
+    match value {
+      mlua::Value::Integer(byte) => {
+        if byte < 0 || 0xff < byte {
+          return Err(mlua::Error::RuntimeError("supply the memory to write as a byte array (each item must be between 0 and 255".to_string()));
+        }
+
+        bytes.push(byte as u8);
+      },
+      t => return Err(mlua::Error::RuntimeError(format!("unsupported argument, provide memory as a byte array. Expected array, got {:?}", t))),
+    }
+    index += 1;
+  }
+
+  let memory = address as *mut u8;
+
+  debug!("Writing {:?} to {}", bytes, address);
+  unsafe {
+    for index in 0..bytes.len() {
+      let address_to_write = memory.add(index);
+      let byte_to_write = bytes[index];
+
+      *address_to_write = byte_to_write;
+    }
+  }
+
+  Ok(())
+}
+
+/// Read any memory address and convert it to the given type in lua.
+fn read_memory_function<'lua>(lua: &'lua Lua, (address, type_name): (u32, String)) -> Result<mlua::Value<'lua>, mlua::Error> {
+  debug!("Read memory address {} with type {}", address, type_name);
+  let value_type = match Type::try_from_str(type_name.as_str()) {
+    Some(t) => t,
+    None => return Err(mlua::Error::RuntimeError("unsupported type".to_string()))
+  };
+
+  let value: mlua::Value;
+  unsafe {
+    value = match value_type {
+      Type::Float => mlua::Value::Number(*(address as *const f32) as f64),
+      Type::String => {
+        let mut string_bytes: Vec<u8> = Vec::new();
+        let string_pointer = address as *const u8;
+  
+        for i in 0..MAX_STRING {
+          let current_value = *(string_pointer.add(i.into()));
+          
+          if current_value == 0 {
+            break;
+          }
+  
+          string_bytes.push(current_value);
+        }
+  
+        mlua::Value::String(lua.create_string(string_bytes.as_slice())?)
+      },
+      Type::Integer => mlua::Value::Integer(*(address as *const i32)),
+      Type::Void => mlua::Value::Nil,
+      Type::Short => mlua::Value::Integer((*(address as *const i16)).into()),
+      Type::Byte => mlua::Value::Integer((*(address as *const i8)).into()),
+    }
+  }
+
+  Ok(value)
 }
