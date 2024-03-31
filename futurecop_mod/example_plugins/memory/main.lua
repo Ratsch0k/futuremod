@@ -1,4 +1,5 @@
 local dangerous = require("dangerous")
+local input = require("input")
 
 -- Memory addresses and offsets for player and weapon ammo
 local PLAYER_ARRAY = 0x00511fd0
@@ -26,18 +27,13 @@ function onUpdate()
     specialWeaponAmmoAddress = playerOneAddress + SPECIAL_WEAPON_OFFSET
   end
 
-  local gunWeaponAmmo = dangerous.readMemory(gunWeaponAmmoAddress, "short")
-  local heavyWeaponAmmo = dangerous.readMemory(heavyWeaponAmmoAddress, "short")
-  local specialWeaponAmmo = dangerous.readMemory(specialWeaponAmmoAddress, "short")
-
-  print(`Gun: {gunWeaponAmmo}`)
-  print(`Heavy: {heavyWeaponAmmo}`)
-  print(`Special: {specialWeaponAmmo}`)
-
-  -- Sets the ammo to a high value.
-  -- We could get the weapon type and set the ammo to the according max value, but
-  -- this is just an example.
-  dangerous.writeMemory(gunWeaponAmmoAddress, {0x4c, 0x1d})
-  dangerous.writeMemory(heavyWeaponAmmoAddress, {0x4c, 0x1d})
-  dangerous.writeMemory(specialWeaponAmmoAddress, {0x4c, 0x1d})
+  -- Only refill ammo if the player pressed CTRL + R
+  if input.isKeyPressed(input.KeyR) and (input.isKeyPressed(input.KeyLControl) or input.isKeyPressed(input.KeyRControl)) then
+    -- Sets the ammo to a high value.
+    -- We could get the weapon type and set the ammo to the according max value, but
+    -- this is just an example.
+    dangerous.writeMemory(gunWeaponAmmoAddress, {0x4c, 0x1d})
+    dangerous.writeMemory(heavyWeaponAmmoAddress, {0x4c, 0x1d})
+    dangerous.writeMemory(specialWeaponAmmoAddress, {0x4c, 0x1d})
+  end
 end
