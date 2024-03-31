@@ -4,7 +4,7 @@ use anyhow::bail;
 use log::*;
 use mlua::{Lua, OwnedTable};
 use futurecop_data::plugin::{PluginInfo, PluginDependency};
-use super::{library::{dangerous::create_dangerous_library, game::create_game_library}};
+use super::library::{dangerous::create_dangerous_library, game::create_game_library, input::create_input_library};
 
 #[derive(Clone)]
 pub struct PluginEnvironment {
@@ -95,6 +95,7 @@ fn prepare_libraries(lua: Arc<Lua>, info: &PluginInfo) -> Result<HashMap<&'stati
     match library {
       PluginDependency::Dangerous => libraries.insert("dangerous", create_dangerous_library(lua.clone())?),
       PluginDependency::Game => libraries.insert("game", create_game_library(lua.clone())?),
+      PluginDependency::Input => libraries.insert("input", create_input_library(lua.clone())?),
     };
   }
 

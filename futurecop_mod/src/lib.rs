@@ -11,6 +11,7 @@ mod entry;
 mod server;
 mod plugins;
 mod util;
+mod input;
 
 #[macro_use]
 extern crate lazy_static;

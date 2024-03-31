@@ -1,9 +1,10 @@
 use std::{cell::OnceCell, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, time};
 
+use device_query::{DeviceQuery, DeviceState, Keycode};
 use log::*;
 use num;
 use windows::{Win32::System::Diagnostics::Debug::OutputDebugStringA, core::{PCSTR, s}, Win32::UI::Input::KeyboardAndMouse::*};
-use crate::{futurecop::*, config::Config};
+use crate::{config::Config, futurecop::*, input::KeyState};
 use crate::futurecop::global::*;
 use crate::util::install_hook;
 use crate::{plugins::PluginManager, util::Hook};
@@ -100,9 +101,18 @@ pub fn inject(config: Config) {
 }
 
 
+
 fn first_mission_game_loop_function(o: MissionGameLoop) {
+    // Update the current key state
+    let key_states = KeyState::new();
+    match key_states.update() {
+        Ok(_) => (),
+        Err(e) => error!("Error while updating the key state: {}", e.to_string()),
+    }
+
     match GlobalPluginManager::get().lock() {
         Ok(manager) => {
+            // Then call onUpdate
             manager.on_update();
         }
         Err(e) => {

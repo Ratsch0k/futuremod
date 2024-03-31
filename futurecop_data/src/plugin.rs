@@ -7,6 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 pub enum PluginDependency {
   Dangerous,
   Game,
+  Input,
 }
 
 impl Display for PluginDependency {
@@ -14,6 +15,7 @@ impl Display for PluginDependency {
       match self {
         PluginDependency::Dangerous => f.write_str("Dangerous"),
         PluginDependency::Game => f.write_str("Game"),
+        PluginDependency::Input => f.write_str("Input"),
       }
     }
 }
