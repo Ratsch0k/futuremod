@@ -1,5 +1,5 @@
-use std::{collections::HashMap, ffi::c_void, mem, sync::Arc};
-use tokio::sync::Mutex;
+use std::{collections::HashMap, ffi::c_void, mem, sync::{Arc, Mutex}};
+use log::{debug, error};
 use windows::Win32::System::Memory::*;
 use iced_x86::{Code, Decoder, DecoderOptions};
 
@@ -84,6 +84,7 @@ pub enum HookError {
     InvalidTarget,
     Error,
     AlreadyHooked,
+    Other(String),
 }
 
 struct Inner {
@@ -148,18 +149,29 @@ unsafe fn get_patched_prelude(address: u32, required_size: usize, new_address: u
 
 impl Hook {
     pub unsafe fn new(address: u32) -> Hook {
-        let mut hooks = HOOKS.blocking_lock();
+        debug!("Getting lock to hooks");
+        let inner = match HOOKS.lock() {
+            Err(e) => {
+                error!("Couldn't get lock to hooks: {}", e.to_string());
+                panic!("Couldn't get lock to hooks: {}", e.to_string());
+            },
+            Ok(mut hooks) => {
+                debug!("Getting reference to address hook state");
+                match hooks.get(&address) {
+                    Some(inner) => inner.clone(),
+                    None => {
+                        debug!("No reference yet, creating new one");
+                        let inner = Arc::new(Mutex::new(Inner{address, hook: None}));
 
-        let inner = match hooks.get(&address) {
-            Some(inner) => inner.clone(),
-            None => {
-                let inner = Arc::new(Mutex::new(Inner{address, hook: None}));
-
-                hooks.insert(address, inner.clone());
-                inner
+                        hooks.insert(address, inner.clone());
+                        inner
+                    }
+                }
             }
         };
 
+
+        debug!("Created hook instance");
         Hook{inner}        
     }
 
@@ -168,7 +180,7 @@ impl Hook {
     /// The parameter `closure_address` should be the address to the closure with the FnMut trait.
     /// It is expected to be fat pointer.
     pub unsafe fn set_closure<T: ?Sized>(&mut self, closure: Box<T>) -> Result<(), HookError> {
-        let mut inner = self.inner.blocking_lock();
+        let mut inner = self.inner.lock().map_err(|e| HookError::Other(format!("{}", e)))?;
 
         if let Some(_) = inner.hook {
             return Err(HookError::AlreadyHooked);
@@ -299,7 +311,7 @@ impl Hook {
     }
 
     pub unsafe fn set_hook(&mut self, hook_fn: u32) -> Result<(), HookError> {
-        let mut inner = self.inner.blocking_lock();
+        let mut inner = self.inner.lock().map_err(|e| HookError::Other(format!("{}", e.to_string())))?;
 
         if let Some(_) = inner.hook {
             return Err(HookError::AlreadyHooked);
