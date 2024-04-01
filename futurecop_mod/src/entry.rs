@@ -1,6 +1,5 @@
 use std::{cell::OnceCell, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, time};
 
-use device_query::{DeviceQuery, DeviceState, Keycode};
 use log::*;
 use num;
 use windows::{Win32::System::Diagnostics::Debug::OutputDebugStringA, core::{PCSTR, s}, Win32::UI::Input::KeyboardAndMouse::*};
