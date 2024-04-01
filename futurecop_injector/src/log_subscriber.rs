@@ -61,6 +61,7 @@ pub fn connect(base_address: String) -> Subscription<Event> {
 
                                 warn!("Could not connect to log websocket: {}", e);
 
+                                state = State::Disconnected;
                                 let _ = output.send(Event::Disconnected).await;
                             }
                         }
@@ -88,7 +89,9 @@ pub fn connect(base_address: String) -> Subscription<Event> {
                                             }
                                         }
                                     },
-                                    Err(_) => {
+                                    Err(e) => {
+                                        warn!("Error occurred while processing log messages: {}", e.to_string());
+                                        state = State::Disconnected;
                                         let _ = output.send(Event::Disconnected).await;
                                     },
                                     Ok(_) => (),

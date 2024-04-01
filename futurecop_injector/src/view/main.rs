@@ -61,6 +61,7 @@ impl Main {
                     },
                     log_subscriber::Event::Disconnected => {
                         self.logs.state = LogState::Error(format!("Got disconnected"));
+                        self.logs.logs.clear();
                     },
                     log_subscriber::Event::Message(message) => {
                         self.logs.logs.push(message);
