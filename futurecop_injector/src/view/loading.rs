@@ -1,23 +1,35 @@
-use std::{path::{Path, PathBuf}, time::Duration};
+use std::{path::{Path, PathBuf}, time::{Duration, SystemTime}};
 use iced::{widget::{column, container, row, text, Column}, Alignment, Command, Length, Padding};
 use log::*;
 use rfd::FileDialog;
 
 use crate::{api::{self, is_mod_running}, config::get_config, injector::{get_future_cop_handle, inject_mod}, theme, widget::{button, Element}};
 
+const MAX_INJECTION_TRIES: u8 = 3;
+const INJECTION_WAIT_TIMEOUT_SECONDS: u64 = 5;
+
+
+
 #[derive(Debug)]
 pub enum Loading {
   NoPath,
   WaitingForProgram{mod_path: PathBuf},
   InjectionError{mod_path: PathBuf, error: String},
-  WaitingForMod,
+  /// State while waiting for the injected mod to start.
+  /// 
+  /// For some reason, injection isn't always successful on the first try.
+  /// Therefore, we inject the mod again after the mod server didn't start for
+  /// some time. If injection tries exceed a threshold, we show an error.
+  /// This variant keeps track of the time when the mod was injected in this injection
+  /// attempt and how many attempts were already made.
+  WaitingForMod{since: SystemTime, injection_attempts: u8, mod_path: PathBuf},
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
   OpenPathSelection,
   CheckIfStarted,
-  IsModActive(bool)
+  IsModActive(bool),
 }
 
 impl Loading {
@@ -49,7 +61,7 @@ impl Loading {
             .on_press(Message::OpenPathSelection)
         ].into()
       },
-      Loading::WaitingForMod => {
+      Loading::WaitingForMod{..} => {
         column![text("Waiting for mod to start...")].into()
       },
       Loading::InjectionError{error, ..} => {
@@ -101,12 +113,31 @@ impl Loading {
         },
         _ => (),
       },
-      Loading::WaitingForMod => match msg {
+      Loading::WaitingForMod{since, injection_attempts: injection_tries, mod_path} => match msg {
         Message::IsModActive(is_active) => match is_active {
           true => {
             error!("Loading view should never receive Message::IsModActive(true)")
           },
           false => {
+            // Check how much time has passed since waiting for the mod
+            let now = SystemTime::now();
+
+            // If we waited to long for the mod to start, something went wrong. Either show an error or inject againt
+            if now.duration_since(*since).unwrap() > Duration::from_secs(INJECTION_WAIT_TIMEOUT_SECONDS) {
+              // If we already tried injecting a max amount of time, show the user an error
+              if *injection_tries >= MAX_INJECTION_TRIES {
+                warn!("Was never able to successfully inject the mod. Showing error");
+                *self = Loading::InjectionError { mod_path: mod_path.clone().to_path_buf(), error: String::from("Was not able to inject the mod") };
+                return Command::none();
+              }
+            // If there are still some injection tries left and a timeout occurred, try injecting the mod again.
+              info!("Already waiting for the mod for over 5 seconds. Something went wrong. Retrying to inject mod.");
+              let mod_path = mod_path.clone().to_path_buf();
+              *self = Loading::WaitingForMod { since: SystemTime::now(), injection_attempts: *injection_tries + 1, mod_path: mod_path.clone() };
+              return self.try_to_inject_mod(mod_path.clone());
+            }
+
+            // Check if the mod is active
             info!("Checking if mod is active");
 
             return Command::perform(
@@ -164,7 +195,7 @@ impl Loading {
             },
             Ok(_) => {
               info!("Successfully injected mod");
-              *self = Loading::WaitingForMod;
+              *self = Loading::WaitingForMod{since: SystemTime::now(), injection_attempts: 0, mod_path};
               return check_if_mod_running();
             }
           }

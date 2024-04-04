@@ -8,11 +8,14 @@ use super::config::get_config;
 
 
 pub fn get_pid() -> Result<Option<u32>, anyhow::Error> {
+  debug!("Get process id of process");
   let config = get_config();
 
   unsafe {
       let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
           .map_err(|e| anyhow!("Error while getting list of process ids: {}", e))?;
+    
+      debug!("Got list of process ids");
 
       let mut entry: PROCESSENTRY32 = PROCESSENTRY32::default();
       entry.dwSize = size_of::<PROCESSENTRY32>() as u32;
@@ -23,6 +26,7 @@ pub fn get_pid() -> Result<Option<u32>, anyhow::Error> {
                   match PCSTR::from_raw(entry.szExeFile.as_ptr()).to_string() {
                       Ok(process_name) => {
                           if process_name.as_str() == config.process_name {
+                              debug!("Found process in list of processes");
                               return Ok(Some(entry.th32ProcessID));
                           }
                       }
@@ -31,6 +35,7 @@ pub fn get_pid() -> Result<Option<u32>, anyhow::Error> {
 
               }
 
+              debug!("Couldn't find process");
               Ok(None)
           },
           Err(e) => Err(anyhow!("Error while checking first process id: {}", e)),
@@ -39,6 +44,7 @@ pub fn get_pid() -> Result<Option<u32>, anyhow::Error> {
 }
 
 pub fn get_future_cop_handle(require_admin: bool) -> Result<Option<HANDLE>, anyhow::Error> {
+    debug!("Getting handle to futurecop process");
     let pid = match get_pid() {
         Ok(pid) => match pid {
                 Some(pid) => pid,
@@ -46,7 +52,9 @@ pub fn get_future_cop_handle(require_admin: bool) -> Result<Option<HANDLE>, anyh
         },
         Err(e) => return Err(e),
     };
+    debug!("Got process id: {}", pid);
 
+    debug!("Getting handle");
     let process_handle: HANDLE;
     unsafe {
         process_handle = match OpenProcess(PROCESS_ALL_ACCESS, None,  pid) {
@@ -99,6 +107,7 @@ pub fn get_future_cop_handle(require_admin: bool) -> Result<Option<HANDLE>, anyh
 }
 
 pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::Error> {
+    debug!("Injecting mod");
     unsafe {
         debug!("Allocating memory in process");
         let buffer = VirtualAllocEx(fcop_handle, None, mod_path.len() + 1, MEM_COMMIT, PAGE_READWRITE);
@@ -132,6 +141,7 @@ pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::E
 
         let start_routine_address: LPTHREAD_START_ROUTINE = std::mem::transmute(GetProcAddress(kernel32_handle, PCSTR("LoadLibraryA\0".as_ptr())));
 
+        debug!("Creating remote thread to load mod");
         match CreateRemoteThread(
             fcop_handle,
             None,
@@ -146,5 +156,6 @@ pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::E
         }
     }
 
+    debug!("Successfully injected mod");
     Ok(())
 }

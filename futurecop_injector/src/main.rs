@@ -19,9 +19,6 @@ mod palette;
 
 #[derive(Parser)]
 struct Cli {
-    #[arg(short, long)]
-    beta: bool,
-
     #[arg(
         long,
         default_value_t = log::LevelFilter::Info,
