@@ -14,15 +14,18 @@ use futures::TryStreamExt;
 use tokio::{fs::File, io::BufWriter};
 use tokio_util::io::StreamReader;
 
-use crate::{config::Config, plugins::{plugin_info::{load_plugin_info, PluginInfoError}, plugin_manager::PluginInstallError}};
+use crate::{config::Config, plugins::{plugin_info::{load_plugin_info, PluginInfoError}, plugin_manager::{GlobalPluginManager, PluginInstallError}}};
 
-use super::{plugins::{PluginManager, plugin_manager::PluginManagerError}, entry::GlobalPluginManager};
+use super::plugins::{PluginManager, plugin_manager::PluginManagerError};
 
 lazy_static! {
     pub static ref LOG_PUBLISHER: LogPublisher = LogPublisher::new();
     static ref LOG_HISTORY: Arc<RwLock<Vec<(u64, LogRecord)>>> =  Arc::new(RwLock::new(Vec::new()));
 }
 
+/// Start the mod server in a separate thread.
+/// 
+/// Returns the thread's handle.
 pub fn start_server(config: Config) -> JoinHandle<()> {
     let handle = thread::spawn(move || {
         let _ = serve(config);
@@ -31,6 +34,7 @@ pub fn start_server(config: Config) -> JoinHandle<()> {
     handle
 }
 
+/// Start the server
 fn serve(config: Config) -> Result<(), Error> {
     let result = std::panic::catch_unwind(|| {
         let rt = Runtime::new().unwrap();
@@ -56,7 +60,7 @@ fn serve(config: Config) -> Result<(), Error> {
     });
 
     match result {
-        Err(_) => Err(anyhow!("The server paniced")),
+        Err(_) => Err(anyhow!("The server panicked")),
         _ => Ok(())
     }
 }
@@ -221,7 +225,7 @@ fn with_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error> where F: Fn(&Plug
 }
 
 async fn get_plugins() -> Result<Json<HashMap<String, futurecop_data::plugin::Plugin>>, String> {
-    with_plugin_manager(|plugin_manager| {
+    GlobalPluginManager::with_plugin_manager(|plugin_manager| {
         let plugins = plugin_manager.get_plugins();
 
         let mut plugin_response: HashMap<String, futurecop_data::plugin::Plugin> = HashMap::new();

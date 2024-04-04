@@ -9,11 +9,26 @@ use super::plugin_environment::PluginEnvironment;
 const MAIN_FILE_NAME: &str = "main";
 const ALLOWED_EXTENSIONS: [&str; 2] = ["lua", "luau"];
 
+/// Installed mod plugin.
+/// 
+/// Contains the plugin's information and current state.
+/// Is typically managed by [`plugins::PluginManager`]
 #[derive(Debug, Clone, Serialize)]
 pub struct Plugin {
+    /// Whether the plugin is enabled or not.
+    /// 
+    /// A disabled plugin is still in memory, but it's onUpdate function
+    /// will not be called every frame.
     enabled: bool,
+
+    /// Current state of the plugin.
+    /// If loaded, it will contains the current lua state.
     pub state: PluginState,
+
+    /// Plugin information such as the description and authors.
     pub info: PluginInfo,
+
+    /// Reference to lua.
     #[serde(skip)]
     lua: Arc<Lua>,
 }
@@ -28,6 +43,7 @@ impl Into<futurecop_data::plugin::Plugin> for Plugin {
     }
 }
 
+/// Current state of the plugin.
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum PluginState {
@@ -46,6 +62,9 @@ impl Into<futurecop_data::plugin::PluginState> for PluginState {
     }
 }
 
+/// Plugin context.
+/// 
+/// Holds references to the plugin's globals and framework functions.
 #[derive(Debug, Clone)]
 pub struct PluginContext {
     environment: PluginEnvironment,
@@ -190,6 +209,11 @@ impl Plugin {
         Ok(())
     }
 
+    /// Unload the plugin.
+    /// 
+    /// If the plugin is enabled, this function will additionally disable the plugin first.
+    /// Unloading the plugin will remove the plugin from memory.
+    /// *Should be tested to what extend this actually removes the plugin from memory.*
     pub fn unload(&mut self) -> Result<(), PluginError> {
         match &self.state {
             PluginState::Loaded(_) => (),
@@ -212,12 +236,20 @@ impl Plugin {
         Ok(())
     }
 
+    /// Reload the plugin.
+    /// 
+    /// Simply unloads the plugin and loads it again.
     pub fn reload(&mut self) -> Result<(), PluginError> {
         self.unload()?;
 
         self.load()
     }
 
+    /// Disable the plugin.
+    /// 
+    /// Will only disable it and not unload it.
+    /// Meaning, it is kept in memory but it's `onUpdate` function is not called anymore.
+    /// Will call the plugin's `onDisable` function.
     pub fn disable(&mut self) -> Result<(), PluginError> {
         if !self.enabled {
             return Ok(());
@@ -237,6 +269,9 @@ impl Plugin {
         Ok(())
     }
 
+    /// Enable the plugin.
+    /// 
+    /// Also calls the plugin's `onEnable` function.
     pub fn enable(&mut self) -> Result<(), PluginError> {
         if self.enabled {
             return Ok(());
@@ -259,6 +294,10 @@ impl Plugin {
         Ok(())
     }
 
+    /// Call the plugin's `onUpdate` function.
+    /// 
+    /// Returns an error if the plugin is not enabled.
+    /// Will not call the function if the plugin is in an error state.
     pub fn on_update(&self) -> Result<(), PluginError> {
         if !self.enabled {
             return Err(PluginError::NotEnabledError);
@@ -280,6 +319,7 @@ impl Plugin {
         Ok(())
     }
 
+    /// Whether the plugin is enabled or not.
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
@@ -300,7 +340,9 @@ fn get_lua_function_or_none<'lua>(module: &'lua Table, name: &str) -> Option<Own
     }
 }
 
-
+/// Searches for the main file of a plugin within a directory.
+/// 
+/// If it cannot identify any main, it will return an error.
 fn discover_main_file(directory: &PathBuf) -> Result<PathBuf, PluginError> {
     let files = directory.read_dir()
         .map_err(|e| PluginError::Error(format!("Error while reading mod directory '{:?}': {:?}", directory, e)))?
@@ -328,7 +370,7 @@ fn discover_main_file(directory: &PathBuf) -> Result<PathBuf, PluginError> {
             Some(stem) => match stem.to_str() {
                 Some(stem) => stem,
                 None => {
-                    warn!("Coulnd't convert file stem '{:?}' to string", stem);
+                    warn!("Couldn't convert file stem '{:?}' to string", stem);
                     continue;
                 },
             },

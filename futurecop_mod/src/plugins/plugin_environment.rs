@@ -6,9 +6,17 @@ use mlua::{Lua, OwnedTable};
 use futurecop_data::plugin::{PluginInfo, PluginDependency};
 use super::library::{dangerous::create_dangerous_library, game::create_game_library, input::create_input_library};
 
+/// Holds the entire plugin environment.
+/// 
+/// Holds a reference to the plugin's globals, such as functions and global
+/// variables.
+/// Also contains the plugin's package cache which contains libraries and other
+/// files the plugin required
 #[derive(Clone)]
 pub struct PluginEnvironment {
+  /// Plugin globals.
   pub table: OwnedTable,
+  /// Plugin package cache
   package_cache: Arc<Mutex<HashMap<PathBuf, mlua::OwnedTable>>>,
 }
 
@@ -103,6 +111,7 @@ fn prepare_libraries(lua: Arc<Lua>, info: &PluginInfo) -> Result<HashMap<&'stati
 }
 
 impl PluginEnvironment {
+  /// Create a new plugin environment for a plugin with the given information.
   pub fn new(lua: Arc<Lua>, plugin_info: &PluginInfo) -> Result<Self, mlua::Error> {
     let table = lua.create_table()?;
 

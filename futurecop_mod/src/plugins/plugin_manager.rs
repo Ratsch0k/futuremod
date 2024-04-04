@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::{collections::HashMap, fs};
 use futurecop_data::plugin::PluginError;
 use log::*;
@@ -12,6 +12,63 @@ use anyhow::anyhow;
 
 use super::plugin::*;
 use super::plugin_info::PluginInfoError;
+
+static mut GLOBAL_PLUGIN_MANAGER: OnceLock<Arc<Mutex<PluginManager>>> = OnceLock::new();
+
+/// Global plugin manager.
+/// 
+/// Global instance of the plugin manager that manages all
+/// plugins and the script runtime environment and the plugin
+/// context.
+/// Instead of creating new instances of [`PluginManager`], use this
+/// struct and its methods instead.
+/// 
+/// This struct is initialized (or should at least) the start of mod's lifecycle.
+pub struct GlobalPluginManager;
+
+impl GlobalPluginManager {
+    pub fn get() -> Arc<Mutex<PluginManager>> {
+        let plugin_manager;
+        unsafe {plugin_manager = GLOBAL_PLUGIN_MANAGER.get().unwrap()};
+
+        return plugin_manager.clone();
+    }
+
+    pub fn with_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error>
+    where F: Fn(&PluginManager) -> Result<R, anyhow::Error> {
+        match GlobalPluginManager::get().lock() {
+            Ok(m) => f(&m),
+            Err(e) => return Err(anyhow!("could not get lock to plugin manager: {:?}", e)),
+        }
+    }
+
+    pub fn with_plugin_manager_mut<F, R>(f: F) -> Result<R, anyhow::Error>
+    where F: Fn(&mut PluginManager) -> Result<R, anyhow::Error> {
+        let plugin_manager;
+        unsafe {plugin_manager = GLOBAL_PLUGIN_MANAGER.get().unwrap()}
+
+        match plugin_manager.lock() {
+            Ok(mut m) => f(&mut m),
+            Err(e) => return Err(anyhow!("could not get mutable lock to plugin manager: {:?}", e)),
+        }
+    }
+
+    /// Initialize the global plugin manager.
+    /// 
+    /// Should only be called once for the entire life of the mod.
+    /// If its called a multiple time, calls after the first call will error.
+    /// Additionally, if plugin initialization errors, this also returns an error.
+    pub fn initialize(plugins_directory: PathBuf) -> Result<(), anyhow::Error> {
+        let plugin_manager = match PluginManager::new(plugins_directory) {
+            Ok(m) => m,
+            Err(e) => {
+                anyhow::bail!("{:?}", e)
+            }
+        };
+        let p = Arc::new(Mutex::new(plugin_manager));
+        unsafe { GLOBAL_PLUGIN_MANAGER.set(p).map_err(|_| anyhow!("global plugin manager already initialized")) }
+    }
+}
 
 #[derive(Debug)]
 pub enum PluginManagerError {
@@ -90,14 +147,28 @@ fn persist_plugin_state_change(states: &mut PersistentPluginStates, plugin: &Plu
     }
 }
 
+/// Manages plugins.
+/// 
+/// **Should never be instantiated manually. [`GlobalPluginManager`] should be used to
+/// get the global plugin manager instance.**
+/// Loads and manages all plugins
 pub struct PluginManager {
+  /// All plugins
   pub plugins: HashMap<String, Plugin>,
+  //// Directory where the plugins are stored
   pub plugins_directory: PathBuf,
+  /// Persistence state
   persistent_states: PersistentPluginStates,
+  /// Reference to lua
   lua: Arc<Lua>,
 }
 
 impl PluginManager {
+  /// Load all plugins from the given folder and create a PluginManager that
+  /// with the contained plugins.
+  /// Before loading any plugins from the directory, it will first load the state persistence file from the directory
+  /// if it exists. This file persists whether the user enabled or disabled a plugin.
+  /// For plugins not in the persistence file, they will be loaded but disabled.
   pub fn new(plugins_directory: PathBuf) -> Result<Self, PluginManagerError> {
       let lua = Arc::new(Lua::new());
 
@@ -230,6 +301,7 @@ impl PluginManager {
       )
   }
 
+  /// Call `onUpdate` function of all enabled plugins.
   pub fn on_update(&self) {
       for (_, plugin) in &self.plugins {
           
@@ -246,7 +318,7 @@ impl PluginManager {
       }
   }
 
-
+  /// Enable the plugin
   pub fn enable_plugin(&mut self, name: &String) -> Result<(), PluginManagerError> {
       info!("Enable plugin '{}'", name);
       let plugin = match self.plugins.get_mut(name) {
@@ -263,6 +335,7 @@ impl PluginManager {
       Ok(())
     }
 
+  /// Disable the plugin
   pub fn disable_plugin(&mut self, name: &String) -> Result<(), PluginManagerError> {
       info!("Disable plugin '{}'", name);
       match self.plugins.get_mut(name) {
@@ -279,6 +352,7 @@ impl PluginManager {
       }
   }
 
+  /// Reload the plugin
   pub fn reload_plugin(&mut self, name: &str) -> Result<(), PluginManagerError> {
     info!("Reloading plugin '{}'", name);
 
@@ -388,6 +462,7 @@ impl PluginManager {
     plugin.unload().map_err(PluginManagerError::Plugin)
   }
 
+  // Uninstall the plugin.
   pub fn uninstall_plugin(&mut self, name: &str) -> Result<(), PluginManagerError> {
     info!("Uninstalling plugin: {}", name);
 

@@ -12,7 +12,8 @@ pub enum PluginInfoError {
   Format(String),
 }
 
-
+/// Load the plugin info file from the given plugin folder.
+/// If no plugin info file exists, returns an error.
 pub fn load_plugin_info(path: PathBuf) -> Result<futurecop_data::plugin::PluginInfo, PluginInfoError> {
     let path = path.canonicalize().map_err(|e| PluginInfoError::Other(format!("Could not access plugin folder: {:?}", e)))?;
 

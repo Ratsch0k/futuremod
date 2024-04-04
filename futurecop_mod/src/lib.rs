@@ -19,6 +19,9 @@ extern crate lazy_static;
 
 static mut IS_ATTACHED: bool = false;
 
+/// Main entry point to the DLL.
+/// 
+/// Simply attaches itself to the game.
 #[no_mangle]
 #[allow(non_snake_case, unused_variables)]
 unsafe extern "system" fn DllMain(
@@ -36,15 +39,10 @@ unsafe extern "system" fn DllMain(
     true
 }
 
-#[no_mangle]
-#[allow(unused_variables)]
-unsafe extern "system" fn Test(hwnd: HWND, hinst: HINSTANCE, cmd_line: PCSTR, cmd_show: i32) {
-    OutputDebugStringA(s!("Hello from Test"))
-}
-
+/// Attach the mod
+/// 
+/// Calls the mod's entry main function in a separate thread.
 unsafe fn attach() {
-    //let _ = setup_logging("INFO");
-
     if IS_ATTACHED {
         OutputDebugStringA(s!("Already attached"));
     } else {
@@ -102,11 +100,14 @@ unsafe extern "system" fn main(_: *mut c_void) -> u32 {
         _ => (),
     }
     
-    entry::inject(config);
+    entry::main(config);
 
     return 0;
 }
 
+/// Setup logging.
+/// 
+/// Initializes fern logging with the websocket based logger, simply debug output and file base logging
 fn setup_logging(level: &str) -> Result<(), fern::InitError> {
     fern::Dispatch::new()
         .level(log::LevelFilter::from_str(level).unwrap_or(log::LevelFilter::Info))

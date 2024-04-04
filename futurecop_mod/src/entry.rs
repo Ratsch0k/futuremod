@@ -3,13 +3,11 @@ use std::{cell::OnceCell, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, tim
 use log::*;
 use num;
 use windows::{Win32::System::Diagnostics::Debug::OutputDebugStringA, core::{PCSTR, s}, Win32::UI::Input::KeyboardAndMouse::*};
-use crate::{config::Config, futurecop::*, input::KeyState};
+use crate::{config::Config, futurecop::*, input::KeyState, plugins::plugin_manager::GlobalPluginManager};
 use crate::futurecop::global::*;
 use crate::util::install_hook;
 use crate::{plugins::PluginManager, util::Hook};
 use crate::server;
-use anyhow::anyhow;
-
 
 static mut CONFIG: Option<Config> = None;
 
@@ -24,48 +22,16 @@ static mut FIRST_MISSION_GAME_LOOP_FUNCTION: Option<VoidFunction> = None;
 
 static mut PLUGIN_MANAGER: OnceCell<Arc<Mutex<PluginManager>>> = OnceCell::new();
 
-pub struct GlobalPluginManager;
 
-impl GlobalPluginManager {
-    pub fn get() -> Arc<Mutex<PluginManager>> {
-        let plugin_manager;
-        unsafe {plugin_manager = PLUGIN_MANAGER.get().unwrap()};
-
-        return plugin_manager.clone();
-    }
-
-    pub fn with_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error>
-    where F: Fn(&PluginManager) -> R {
-        let plugin_manager = GlobalPluginManager::get();
-
-        let plugin_manager = match plugin_manager.lock() {
-            Ok(m) => m,
-            Err(e) => return Err(anyhow!("could not get lock to plugin manager: {:?}", e)),
-        };
-
-        Ok(f(&plugin_manager))
-    }
-
-    pub fn with_plugin_manager_mut<F, R>(f: F) -> Result<R, anyhow::Error>
-    where F: Fn(&mut PluginManager) -> R {
-        let plugin_manager;
-        unsafe {plugin_manager = PLUGIN_MANAGER.get().unwrap()}
-
-        let mut plugin_manager = match plugin_manager.lock() {
-            Ok(m) => m,
-            Err(e) => return Err(anyhow!("could not get mutable lock to plugin manager: {:?}", e)),
-        };
-
-        Ok(f(&mut plugin_manager))
-    }
-}
 
 type MissionGameLoop = fn() -> ();
 
-pub fn inject(config: Config) {
+/// Main entry function of the entire mod.
+/// 
+/// Sets some always active hooks, configures and initializes global services (e.g. PluginManager) and starts the server.
+pub fn main(config: Config) {
     unsafe {
         ORIGINAL_PLAYER_METHOD = install_hook(0x00446800, player_method);
-        ORIGINAL_DAMAGE_PLAYER = install_hook(0x00446720, damage_player_hook);
         //FIRST_MISSION_GAME_LOOP_FUNCTION = install_hook(FUN_00406a30_ADDRESS, first_mission_game_loop_function);
         let mut hook = Hook::new(FUN_00406A30_ADDRESS);
         let _ = hook.set_hook(first_mission_game_loop_function as u32).map_err(|_| warn!("Could not hook game loop"));
@@ -84,19 +50,17 @@ pub fn inject(config: Config) {
         }
     );
 
-    let plugin_manager = match PluginManager::new(plugins_directory) {
-        Ok(m) => m,
+    // Initialize global plugin manager or panic
+    match GlobalPluginManager::initialize(plugins_directory) {
         Err(e) => {
-            error!("Couldn't initiate plugin manager: {:?}", e);
-            panic!();
-        }
-    };
-    let p = Arc::new(Mutex::new(plugin_manager));
-    unsafe { let _ = PLUGIN_MANAGER.set(p); }
+            panic!("error while initializing the global plugin manager: {}", e);
+        },
+        Ok(_) => (),
+    }
 
     server::start_server(config);
 
-    start();
+    mod_loop();
 }
 
 
@@ -169,7 +133,15 @@ fn handle_player_sprint(player_id: u8, player_entity: &mut PlayerEntity) {
     }
 }
 
-pub fn start() {
+/// Mod infinite loop.
+/// 
+/// As long as no plugin exists to allow sprinting, this function is used for simple implementation
+/// of a sprinting mod.
+/// Every 10 ms set the player's acceleration to a higher values based on the current values.
+/// This is janky implementation as we are not actually hooking into player's movement
+/// function and instead hope that our function overrides the acceleration after the game's logic
+/// clamped it and before the game moved the player.
+pub fn mod_loop() {
     loop {
         unsafe {
             if FIRST_PLAYER.is_some() {
@@ -242,78 +214,4 @@ unsafe fn player_method(param1: i32, player_entity: u32, param3: u32, param4: u3
 
     error!("OriginalPlayerMethod not found");
     return 0;
-}
-
-
-unsafe fn is_precinct_assault() {
-    let address = 0x00511e03usize;
-    let mode = address as *const u8;
-
-    let msg = format!("IsPrecinctAssault: {}\n\0", *mode);
-    OutputDebugStringA(PCSTR(msg.as_ptr()));
-}
-
-unsafe fn print_key_bitmap() {
-    let address = 0x00511f9cusize;
-    let key_bitmap = address as *const u32;
-
-    OutputDebugStringA(PCSTR(format!("KeyBitMap: {:#010x}\n\0", *key_bitmap).as_ptr()));
-}
-
-
-unsafe fn set_health() {
-    if FIRST_PLAYER.is_none() {
-        //OutputDebugStringA(s!("Cannot modify health as address to player entity is unknown"));
-        return;
-    }
-
-    let player_entity = {
-        let mut d = FIRST_PLAYER;
-        if SECOND_PLAYER.is_some() {
-            d = SECOND_PLAYER;
-        }
-
-        d.unwrap()
-    };
-    
-    let max_health = (*player_entity).health.max_health;
-
-    (*player_entity).health.health = max_health;
-}
-
-
-unsafe fn damage_player_hook(player: *mut PlayerEntity, damage: i32) {
-    if ORIGINAL_DAMAGE_PLAYER.is_none() {
-        error!("Original DamagePlayer function not found");
-        return;
-    }
-    let original_damage_player = ORIGINAL_DAMAGE_PLAYER.unwrap();
-
-    if CONFIG.is_some() {
-        let config = &CONFIG.clone().unwrap();
-        let player_id: i32 = {
-            let mut id: i32 = -1;
-
-            if FIRST_PLAYER.is_some() && (*FIRST_PLAYER.unwrap()).id == (*player).id {
-                id = 1;
-            } else if SECOND_PLAYER.is_some() && (*SECOND_PLAYER.unwrap()).id == (*player).id {
-                id = 2;
-            }
-
-            id
-        };
-        let _second_player_exists = SECOND_PLAYER.is_some();
-
-        let should_negate_damage = 
-            (player_id == 1 && config.player_one.invincible) ||
-            (player_id == 2 && config.player_two.invincible);
-
-        if should_negate_damage {
-            info!("Player {} would have taken {} damage\n\0", player_id, damage);
-
-            return original_damage_player(player, 0);
-        }
-    }
-
-    return original_damage_player(player, damage);
 }
