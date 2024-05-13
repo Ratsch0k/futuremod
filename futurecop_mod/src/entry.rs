@@ -18,10 +18,11 @@ static mut PLAYER_ENTITY_ADDRESS: Option<u32> = None;
 static mut FIRST_PLAYER: Option<*mut PlayerEntity> = None;
 static mut SECOND_PLAYER: Option<*mut PlayerEntity> = None;
 static mut ORIGINAL_DAMAGE_PLAYER: Option<DamagePlayer> = None;
-static mut FIRST_MISSION_GAME_LOOP_FUNCTION: Option<VoidFunction> = None;
+static mut FIRST_MISSION_GAME_LOOP_FUNCTION: Option<VoidFunction> = None;   
 
 static mut PLUGIN_MANAGER: OnceCell<Arc<Mutex<PluginManager>>> = OnceCell::new();
 
+static mut ORIGINAL_RENDER_TEXT_FUNC: Option<RenderTextFunction> = None;
 
 
 type MissionGameLoop = fn() -> ();
@@ -34,8 +35,17 @@ pub fn main(config: Config) {
         ORIGINAL_PLAYER_METHOD = install_hook(0x00446800, player_method);
         //FIRST_MISSION_GAME_LOOP_FUNCTION = install_hook(FUN_00406a30_ADDRESS, first_mission_game_loop_function);
         let mut hook = Hook::new(FUN_00406A30_ADDRESS);
-        let _ = hook.set_hook(first_mission_game_loop_function as u32).map_err(|_| warn!("Could not hook game loop"));
+        let _ = hook.stack_aware_set_hook(first_mission_game_loop_function as u32).map_err(|_| warn!("Could not hook game loop"));
 
+        //let mut render_hook = Hook::new(0x0040cc30);
+        //let _ = render_hook.set_hook(render_function as u32).map_err(|e| warn!("Could not hook render function: {:?}", e));
+
+        let mut load_asset_hook = Hook::new(0x00416470);
+        let _ = load_asset_hook.stack_aware_set_hook(load_next_mission_asset as u32).map_err(|_| warn!("Could not hook load asset function"));
+
+        //let mut render_text_hook: Hook = Hook::new(0x0040dda0);
+        //let _ = render_text_hook.stack_aware_set_hook(render_text_function as u32).map_err(|e| warn!("Could not hook render text function"));
+        //ORIGINAL_RENDER_TEXT_FUNC = install_hook(0x0040dda0, render_text_function);
 
         CONFIG = Some(config.clone());
     }
@@ -63,6 +73,63 @@ pub fn main(config: Config) {
     mod_loop();
 }
 
+static mut RENDER: bool = true;
+
+type RenderTextFunction = fn(u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u64;
+fn render_text_function(o: RenderTextFunction, arg0: u32, arg1: u32, arg2: u32, arg3: u32, arg4: u32, arg5: u32, arg6: u32, arg7: u32, arg8: u32) -> u64 {
+    info!("Render text: {:x}, {:x}, {:x}, {:x}, {:x}, {:x}, {:x}, {:x}, {:x}", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+
+    unsafe {
+    if RENDER {
+        let r = o(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+    }
+
+    RENDER = !RENDER;
+}
+
+    //unsafe {
+    //    let surface_data = arg1 as *mut u8;
+//
+    //    for i in 0..1 {
+    //        *surface_data.offset(i) = 0x0;
+    //    }
+    //}
+
+    0
+}
+
+type LoadNextAsset = fn(u8) -> u32;
+fn load_next_mission_asset(o: LoadNextAsset, allow_file_read: u8) -> u32 {
+    info!("Loading next asset with allow_file_read={}", allow_file_read);
+    let potential_asset_ptr = o(allow_file_read);
+    info!("Loaded next asset: {:x}", potential_asset_ptr);
+
+    unsafe {
+        if potential_asset_ptr != 0 {
+            info!("Parsing returned asset");
+            let potential_asset_ptr = potential_asset_ptr as *const u32;
+
+            let asset_type = {
+                let asset_type_raw = *potential_asset_ptr.offset(6);
+
+                String::from_utf8(asset_type_raw.to_le_bytes().to_vec()).unwrap_or(format!("{:x} (could not parse)", asset_type_raw))
+            };
+            let asset_id = *potential_asset_ptr.offset(7);
+
+            info!("Loaded asset with type={} and id=0x{:x}", asset_type, asset_id);
+        } else {
+            info!("Loading asset returned null pointer");
+        }
+    }
+
+    potential_asset_ptr
+}
+
+type RenderFunction = fn(u32) -> ();
+fn render_function(original: RenderFunction, arg: u32) {
+    info!("Render function called");
+    original(arg);
+}
 
 
 fn first_mission_game_loop_function(o: MissionGameLoop) {
