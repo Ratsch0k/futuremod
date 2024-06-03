@@ -41,21 +41,56 @@ pub static MAIN_WINDOW: VolatileGlobal<u32> = VolatileGlobal::new(0x00512db4);
 pub static HEAP: VolatileGlobal<u32> = VolatileGlobal::new(0x00512ebc);
 pub static FUTURE_COP_MODULE: VolatileGlobal<u32> = VolatileGlobal::new(0x004a005c);
 pub static EVENTS: VolatileGlobal<u32> = VolatileGlobal::new(0x00512044);
+pub static ENTITY_LIST_FIRST: VolatileGlobal<u32> = VolatileGlobal::new(0x00499b0c);
+pub static ENTITY_LIST_ENTRY: VolatileGlobal<u32> = VolatileGlobal::new(0x00499ad0);
+pub static SURFACE: VolatileGlobal<u32> = VolatileGlobal::new(0x00511f64);
+pub static SURFACE_COPY: VolatileGlobal<u32> = VolatileGlobal::new(0x00511dc4);
+
 
 
 ///////////////////////////////////////////////////////////
-// Functions
+// Function Types
 ///////////////////////////////////////////////////////////
 pub type DamagePlayer = unsafe fn(*mut PlayerEntity, i32);
 pub type EntityMethod = unsafe fn(i32, u32, u32, u32) -> u32;
 pub type GameLoop = unsafe fn(i32);
 pub type VoidFunction = unsafe fn();
+pub type RenderCharacterFunction = unsafe fn(u32, u32, u32, u32) -> u32;
+pub type RenderTextFunction = unsafe fn(*const u8, u32, u32, u32);
 
 ///////////////////////////////////////////////////////////
 // Function Addresses
 ///////////////////////////////////////////////////////////
 /// This is the first game function called in the main mission game loop.
 pub const FUN_00406A30_ADDRESS: u32 = 0x00406a30;
+pub const RENDER_CHARACTER_FUNCTION_ADDRESS: u32 = 0x00436130;
+pub const RENDER_TEXT_FUNCTION_ADDRESS: u32 = 0x00435f40;
+
+
+///////////////////////////////////////////////////////////
+// Functions
+///////////////////////////////////////////////////////////
+macro_rules! fn_cast {
+    ($address:expr, $t:ty) => {
+        std::mem::transmute::<*const (), $t>($address as _)
+    };
+}
+
+pub fn render_character(character: u32, pos_x: u32, pos_y: u32, palette: u32) -> u32 {
+    let fn_ptr = RENDER_CHARACTER_FUNCTION_ADDRESS as *const();
+    unsafe {
+        let render_character_fn = {std::mem::transmute::<_, RenderCharacterFunction>(fn_ptr)};
+        render_character_fn(character, pos_x, pos_y, palette)
+    }
+}
+
+pub fn render_text(text: *const u8, pos_x: u32, pos_y: u32, palette: u32) {
+    unsafe {
+        let render_text_fn = fn_cast!(RENDER_TEXT_FUNCTION_ADDRESS, RenderTextFunction);
+        render_text_fn(text, pos_x, pos_y, palette);
+    }
+
+}
 
 
 ///////////////////////////////////////////////////////////
