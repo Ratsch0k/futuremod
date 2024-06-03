@@ -37,16 +37,6 @@ pub fn main(config: Config) {
         let mut hook = Hook::new(FUN_00406A30_ADDRESS);
         let _ = hook.stack_aware_set_hook(first_mission_game_loop_function as u32).map_err(|_| warn!("Could not hook game loop"));
 
-        //let mut render_hook = Hook::new(0x0040cc30);
-        //let _ = render_hook.set_hook(render_function as u32).map_err(|e| warn!("Could not hook render function: {:?}", e));
-
-        let mut load_asset_hook = Hook::new(0x00416470);
-        let _ = load_asset_hook.stack_aware_set_hook(load_next_mission_asset as u32).map_err(|_| warn!("Could not hook load asset function"));
-
-        //let mut render_text_hook: Hook = Hook::new(0x0040dda0);
-        //let _ = render_text_hook.stack_aware_set_hook(render_text_function as u32).map_err(|e| warn!("Could not hook render text function"));
-        //ORIGINAL_RENDER_TEXT_FUNC = install_hook(0x0040dda0, render_text_function);
-
         CONFIG = Some(config.clone());
     }
 
@@ -71,31 +61,6 @@ pub fn main(config: Config) {
     server::start_server(config);
 
     mod_loop();
-}
-
-static mut RENDER: bool = true;
-
-type RenderTextFunction = fn(u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u64;
-fn render_text_function(o: RenderTextFunction, arg0: u32, arg1: u32, arg2: u32, arg3: u32, arg4: u32, arg5: u32, arg6: u32, arg7: u32, arg8: u32) -> u64 {
-    info!("Render text: {:x}, {:x}, {:x}, {:x}, {:x}, {:x}, {:x}, {:x}, {:x}", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-
-    unsafe {
-    if RENDER {
-        let r = o(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-    }
-
-    RENDER = !RENDER;
-}
-
-    //unsafe {
-    //    let surface_data = arg1 as *mut u8;
-//
-    //    for i in 0..1 {
-    //        *surface_data.offset(i) = 0x0;
-    //    }
-    //}
-
-    0
 }
 
 type LoadNextAsset = fn(u8) -> u32;
@@ -123,12 +88,6 @@ fn load_next_mission_asset(o: LoadNextAsset, allow_file_read: u8) -> u32 {
     }
 
     potential_asset_ptr
-}
-
-type RenderFunction = fn(u32) -> ();
-fn render_function(original: RenderFunction, arg: u32) {
-    info!("Render function called");
-    original(arg);
 }
 
 
