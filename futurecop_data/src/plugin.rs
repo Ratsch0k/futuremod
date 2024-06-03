@@ -8,6 +8,16 @@ pub enum PluginDependency {
   Dangerous,
   Game,
   Input,
+  #[serde(rename = "ui")]
+  UI,
+  System,
+
+  // The following libraries are from the standard library
+  Math,
+  Table,
+  Bit,
+  String,
+  Utf8,
 }
 
 impl Display for PluginDependency {
@@ -16,6 +26,13 @@ impl Display for PluginDependency {
         PluginDependency::Dangerous => f.write_str("Dangerous"),
         PluginDependency::Game => f.write_str("Game"),
         PluginDependency::Input => f.write_str("Input"),
+        PluginDependency::UI => f.write_str("UI"),
+        PluginDependency::System => f.write_str("System"),
+        PluginDependency::Math => f.write_str("Math"),
+        PluginDependency::Table => f.write_str("Table"),
+        PluginDependency::Bit => f.write_str("Bit"),
+        PluginDependency::String => f.write_str("String"),
+        PluginDependency::Utf8 => f.write_str("Utf8")
       }
     }
 }

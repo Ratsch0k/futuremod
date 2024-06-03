@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::{collections::HashMap, fs};
 use futurecop_data::plugin::PluginError;
 use log::*;
-use mlua::Lua;
+use mlua::{Lua, StdLib};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 use crate::plugins::plugin_info::load_plugin_info;
@@ -171,6 +171,10 @@ impl PluginManager {
   /// For plugins not in the persistence file, they will be loaded but disabled.
   pub fn new(plugins_directory: PathBuf) -> Result<Self, PluginManagerError> {
       let lua = Arc::new(Lua::new());
+      if let Err(e) = lua.load_from_std_lib(StdLib::STRING | StdLib::BIT | StdLib::MATH | StdLib::TABLE) {
+        error!("Could not load subset of standard library: {}", e);
+        return Err(PluginManagerError::Other(format!("Standard library error import: {}", e)));
+      }
 
       if !plugins_directory.is_dir() {
         info!("Plugin directory doesn't exist, creating it.");

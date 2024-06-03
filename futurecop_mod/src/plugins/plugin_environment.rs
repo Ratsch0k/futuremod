@@ -4,7 +4,7 @@ use anyhow::bail;
 use log::*;
 use mlua::{Lua, OwnedTable};
 use futurecop_data::plugin::{PluginInfo, PluginDependency};
-use super::library::{dangerous::create_dangerous_library, game::create_game_library, input::create_input_library};
+use super::library::{dangerous::create_dangerous_library, game::create_game_library, input::create_input_library, system::create_system_library, ui::create_ui_library};
 
 /// Holds the entire plugin environment.
 /// 
@@ -99,11 +99,20 @@ unsafe fn lua_to_raw<'a>(lua_type: Type, lua_value: &'a mlua::Value) -> Result<V
 fn prepare_libraries(lua: Arc<Lua>, info: &PluginInfo) -> Result<HashMap<&'static str, mlua::OwnedTable>, mlua::Error> {
   let mut libraries = HashMap::new();
 
+  let globals = lua.globals();
+
   for library in info.dependencies.iter() {
     match library {
       PluginDependency::Dangerous => libraries.insert("dangerous", create_dangerous_library(lua.clone())?),
       PluginDependency::Game => libraries.insert("game", create_game_library(lua.clone())?),
       PluginDependency::Input => libraries.insert("input", create_input_library(lua.clone())?),
+      PluginDependency::UI => libraries.insert("ui", create_ui_library(lua.clone())?),
+      PluginDependency::System => libraries.insert("system", create_system_library(lua.clone())?),
+      PluginDependency::Math => libraries.insert("math", globals.get("math").to_owned()?),
+      PluginDependency::Bit => libraries.insert("bit", globals.get("bit").to_owned()?),
+      PluginDependency::String => libraries.insert("string", globals.get("string").to_owned()?),
+      PluginDependency::Table => libraries.insert("table", globals.get("table").to_owned()?),
+      PluginDependency::Utf8 => libraries.insert("utf8", globals.get("utf8").to_owned()?),
     };
   }
 
