@@ -1,0 +1,5 @@
+name = "FPS Display"
+version = "0.1.0"
+authors = ["Simon Kurz"]
+dependencies = ["ui", "system", "math"]
+description = "Simple FPS display using the UI library."
