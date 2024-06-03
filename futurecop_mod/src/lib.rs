@@ -12,6 +12,7 @@ mod server;
 mod plugins;
 mod util;
 mod input;
+mod api;
 
 #[macro_use]
 extern crate lazy_static;
