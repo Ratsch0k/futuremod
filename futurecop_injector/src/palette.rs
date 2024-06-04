@@ -52,11 +52,11 @@ impl Default for Palette {
             text: color!(0xFAFAFA),
           },
           darkest: Pair {
-            color: color!(0x13111F),
+            color: color!(0x171324),
             text: color!(0xFAFAFA),
           },
         },
-        primary: Primary::generate(color!(0x4012B3), BACKGROUND, color!(0xffffff)),
+        primary: Primary::generate(color!(0x4926A1), BACKGROUND, color!(0xffffff)),
         secondary: Secondary::generate(color!(0x13111F), color!(0xffffff)),
         success: Success::generate(color!(0x9AFF75), BACKGROUND, color!(0xffffff)),
         danger: ColorRange {
