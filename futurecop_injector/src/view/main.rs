@@ -1,7 +1,7 @@
-use iced::{widget::{column, text}, Alignment, Command, Length};
+use iced::{alignment::{Horizontal, Vertical}, widget::{column, container, text}, Alignment, Command, Length};
 use log::debug;
 
-use crate::{config::get_config, log_subscriber::{self, LogRecord}, theme::Button, widget::{button, Element}};
+use crate::{config::get_config, log_subscriber::{self, LogRecord}, theme::{Button, Theme}, widget::{button, Element}};
 
 use super::{logs, plugins};
 
@@ -112,18 +112,30 @@ impl Main {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+        fn menu_button(label: &str) -> iced::widget::Button<'_, Message, Theme> {
+            button(text(label).horizontal_alignment(Horizontal::Center).width(Length::Fill)).width(Length::Fill).height(36)
+        }
+
         match &self.view {
             None => {
-                column![
-                    text("FutureCop Mod").size(24),
+                container(
                     column![
-                        button("Logs").on_press(Message::ToLogs).style(Button::Primary),
-                        button("Plugins").on_press(Message::ToPlugins).style(Button::Primary)
-                    ].spacing(4)
-                ]
+                        text("FutureCop Mod").size(48),
+                        column![
+                            menu_button("Plugins").on_press(Message::ToPlugins).style(Button::Primary),
+                            menu_button("Logs").on_press(Message::ToLogs)
+                        ]
+                        .spacing(8)
+                        .width(Length::Fill)
+                        .max_width(200)
+                        .align_items(Alignment::Center)
+                    ].spacing(24)
+                    .align_items(Alignment::Center)
+                )
                 .width(Length::Fill)
-                .spacing(16)
-                .align_items(Alignment::Center)
+                .height(Length::Fill)
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center)
                 .into()
             },
             Some(view) => match view {
