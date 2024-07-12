@@ -463,6 +463,7 @@ impl NativeFunction {
     let arg_len = args.len();
 
     unsafe {
+      #[allow(unused_assignments)]
       let mut raw_response: u32 = 0;
 
         // Call native function with arguments
@@ -683,7 +684,7 @@ fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_type
   }
 }
 
-fn get_native_function<'lua>(lua: &'lua Lua, (address, arg_types, return_type): (u32, Vec<String>, String)) -> Result<NativeFunction, mlua::Error> {
+fn get_native_function<'lua>(_: &'lua Lua, (address, arg_types, return_type): (u32, Vec<String>, String)) -> Result<NativeFunction, mlua::Error> {
   let mut lua_arg_types: Vec<Type> = Vec::new();
   for arg_type in arg_types {
     match Type::try_from_str(&arg_type) {

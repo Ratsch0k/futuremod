@@ -72,7 +72,7 @@ pub const RENDER_CHARACTER_FUNCTION_ADDRESS: u32 = 0x00436130;
 pub const RENDER_TEXT_FUNCTION_ADDRESS: u32 = 0x00435f40;
 pub const RENDRE_RECTANGLE_FUNCTION_ADDRESS: u32 = 0x00415450;
 pub const GET_UPDATE_FUNCTION_OF_BEHAVIOR_ADDRESS: u32 = 0x0041a950;
-pub const UPDATE_FUNCTION_BEHAVIOR_0xA0_ADDRESS: u32 = 0x0041a420;
+pub const UPDATE_FUNCTION_BEHAVIOR_0XA0_ADDRESS: u32 = 0x0041a420;
 pub const RENDER_OBJECT_ADDRESS: u32 = 0x004284b0;
 pub const FUN_004280A0_ADDRESS: u32 = 0x004280a0;
 
@@ -111,7 +111,7 @@ pub fn render_rectangle(color: u32, pos_x: u16, pos_y: u16, width: u16, height: 
 
 pub fn update_function_behavior_0xa0(arg1: u32, arg2: u32, arg3: u32) -> u32 {
     unsafe {
-        let update_fn = fn_cast!(UPDATE_FUNCTION_BEHAVIOR_0xA0_ADDRESS, UpdateFunction);
+        let update_fn = fn_cast!(UPDATE_FUNCTION_BEHAVIOR_0XA0_ADDRESS, UpdateFunction);
         update_fn(arg1, arg2, arg3)
     }
 }
