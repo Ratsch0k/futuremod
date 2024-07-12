@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
-use crate::futurecop::{RenderCharacterFunction, RENDER_CHARACTER_FUNCTION_ADDRESS};
+use serde::{Deserialize, Serialize};
+
+use crate::futurecop::{self, RenderCharacterFunction, RENDER_CHARACTER_FUNCTION_ADDRESS};
 
 
 /// Renders a character onto the screen at the position with a palette.
@@ -29,8 +31,8 @@ pub fn render_character(character: u32, pos_x: u32, pos_y: u32, palette: u32) ->
 /// all numbers, characters in the alphabet, and some special characters. However, be careful as it doesn't support
 /// all ASCII special characters.**
 pub fn render_text(pos_x: u32, pos_y: u32, palette: TextPalette, text: &str) {
-    let characters = text.as_bytes();
-    crate::futurecop::render_text(characters.as_ptr(), pos_x, pos_y, palette.into());
+    let characters = [text.as_bytes(), &[0x00]].concat();
+    futurecop::render_text(characters.as_ptr(), pos_x, pos_y, palette.into());
 }
 
 /// Palette for text.
@@ -134,4 +136,33 @@ impl From<u32> for TextPalette {
             x => TextPalette::Unknown(x),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Color {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+
+impl Into<u32> for Color {
+    fn into(self) -> u32 {
+        // Restrict all color values to 5 bit
+        let capped_r: u32 = self.red as u32 & 0x1f;
+        let capped_g: u32 = self.green as u32 & 0x1f;
+        let capped_b: u32 = self.blue as u32 & 0x1f;
+
+        // Construct color integer
+        (capped_r << 10) | (capped_g << 5) | capped_b
+    }
+}
+
+pub fn render_rectangle(color: Color, pos_x: u16, pos_y: u16, width: u16, height: u16, semi_transparent: bool) {
+    let converted_color: u32 = color.into();
+    let converted_semi_transparent = match semi_transparent {
+        true => 0x3d,
+        false => 0x35,
+    };
+
+    futurecop::render_rectangle(converted_color, pos_x, pos_y, width, height, converted_semi_transparent)
 }
