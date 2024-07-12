@@ -109,7 +109,7 @@ fn prepare_libraries(lua: Arc<Lua>, info: &PluginInfo) -> Result<HashMap<&'stati
       PluginDependency::UI => libraries.insert("ui", create_ui_library(lua.clone())?),
       PluginDependency::System => libraries.insert("system", create_system_library(lua.clone())?),
       PluginDependency::Math => libraries.insert("math", globals.get("math").to_owned()?),
-      PluginDependency::Bit => libraries.insert("bit", globals.get("bit").to_owned()?),
+      PluginDependency::Bit32 => libraries.insert("bit32", globals.get("bit32").to_owned()?),
       PluginDependency::String => libraries.insert("string", globals.get("string").to_owned()?),
       PluginDependency::Table => libraries.insert("table", globals.get("table").to_owned()?),
       PluginDependency::Utf8 => libraries.insert("utf8", globals.get("utf8").to_owned()?),
