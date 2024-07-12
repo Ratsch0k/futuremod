@@ -3,7 +3,7 @@ use std::{cell::OnceCell, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, tim
 use log::*;
 use num;
 use windows::{Win32::System::Diagnostics::Debug::OutputDebugStringA, core::{PCSTR, s}, Win32::UI::Input::KeyboardAndMouse::*};
-use crate::{config::Config, futurecop::*, input::KeyState, plugins::plugin_manager::GlobalPluginManager};
+use crate::{api::graphics::{self, EXAMPLE_ITEM}, config::Config, futurecop::*, input::KeyState, plugins::plugin_manager::GlobalPluginManager};
 use crate::futurecop::global::*;
 use crate::util::install_hook;
 use crate::{plugins::PluginManager, util::Hook};
@@ -108,6 +108,8 @@ fn first_mission_game_loop_function(o: MissionGameLoop) {
             error!("error while getting a lock to the plugin manager to call on_update: {:?}", e)
         },
     }
+
+    graphics::render_item(EXAMPLE_ITEM);
 
     o();
 }
