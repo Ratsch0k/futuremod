@@ -45,7 +45,7 @@ pub static ENTITY_LIST_FIRST: VolatileGlobal<u32> = VolatileGlobal::new(0x00499b
 pub static ENTITY_LIST_ENTRY: VolatileGlobal<u32> = VolatileGlobal::new(0x00499ad0);
 pub static SURFACE: VolatileGlobal<u32> = VolatileGlobal::new(0x00511f64);
 pub static SURFACE_COPY: VolatileGlobal<u32> = VolatileGlobal::new(0x00511dc4);
-
+pub static mut RENDER_ITEMS: VolatileGlobal<u32> = VolatileGlobal::new(0x00511dc0);
 
 
 ///////////////////////////////////////////////////////////
@@ -57,6 +57,11 @@ pub type GameLoop = unsafe fn(i32);
 pub type VoidFunction = unsafe fn();
 pub type RenderCharacterFunction = unsafe fn(u32, u32, u32, u32) -> u32;
 pub type RenderTextFunction = unsafe fn(*const u8, u32, u32, u32);
+pub type RenderRectangleFunction = unsafe fn(u32, u16, u16, u16, u16, u8);
+pub type UpdateFunction = unsafe fn (u32, u32, u32) -> u32;
+pub type RenderObjectRaw = unsafe fn (u32, u32, u32);
+pub type RenderObject = unsafe fn (u32, *mut u32, u32);
+
 
 ///////////////////////////////////////////////////////////
 // Function Addresses
@@ -65,6 +70,11 @@ pub type RenderTextFunction = unsafe fn(*const u8, u32, u32, u32);
 pub const FUN_00406A30_ADDRESS: u32 = 0x00406a30;
 pub const RENDER_CHARACTER_FUNCTION_ADDRESS: u32 = 0x00436130;
 pub const RENDER_TEXT_FUNCTION_ADDRESS: u32 = 0x00435f40;
+pub const RENDRE_RECTANGLE_FUNCTION_ADDRESS: u32 = 0x00415450;
+pub const GET_UPDATE_FUNCTION_OF_BEHAVIOR_ADDRESS: u32 = 0x0041a950;
+pub const UPDATE_FUNCTION_BEHAVIOR_0xA0_ADDRESS: u32 = 0x0041a420;
+pub const RENDER_OBJECT_ADDRESS: u32 = 0x004284b0;
+pub const FUN_004280A0_ADDRESS: u32 = 0x004280a0;
 
 
 ///////////////////////////////////////////////////////////
@@ -92,6 +102,34 @@ pub fn render_text(text: *const u8, pos_x: u32, pos_y: u32, palette: u32) {
 
 }
 
+pub fn render_rectangle(color: u32, pos_x: u16, pos_y: u16, width: u16, height: u16, semi_transparent: u8) {
+    unsafe {
+        let render_rect_fn = fn_cast!(RENDRE_RECTANGLE_FUNCTION_ADDRESS, RenderRectangleFunction);
+        render_rect_fn(color, pos_x, pos_y, width, height, semi_transparent);
+    }
+}
+
+pub fn update_function_behavior_0xa0(arg1: u32, arg2: u32, arg3: u32) -> u32 {
+    unsafe {
+        let update_fn = fn_cast!(UPDATE_FUNCTION_BEHAVIOR_0xA0_ADDRESS, UpdateFunction);
+        update_fn(arg1, arg2, arg3)
+    }
+}
+
+
+pub fn render_object_raw(arg1: u32, arg2: u32, arg3: u32) {
+    unsafe {
+        let render_object_fn = fn_cast!(RENDER_OBJECT_ADDRESS, RenderObjectRaw);
+        render_object_fn(arg1, arg2, arg3);
+    }
+}
+
+pub fn render_object(model_data: u32, value_ref: *mut u32, arg3: u32) {
+    unsafe {
+        let render_object_fn = fn_cast!(FUN_004280A0_ADDRESS, RenderObject);
+        render_object_fn(model_data, value_ref, arg3);
+    }
+}
 
 ///////////////////////////////////////////////////////////
 // Structs
@@ -258,4 +296,138 @@ impl PlayerEntity {
 
         player
     }
+}
+
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct Position {
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+}
+
+
+/// Represents basic entity/actor data.
+/// Used by behavior `0xa0`.
+#[derive(Debug)]
+#[repr(C)]
+pub struct BasicEntity {
+    pub next_entity: u32,
+    pub update_method: u32,
+    pub id: u32,
+    pub unknown0xc: u32,
+    pub unknown0x10: u32,
+    pub unknown0x14: u16,
+    pub behavior_type: u16,
+    pub unknown0x18: u32,
+    pub unknown0x1c: u32,
+    pub unknown0x20: u16,
+    pub unknown0x22: u8,
+    pub map_marker: u8,
+    pub unknown0x24: u32,
+    pub model_data_ref: u32,
+    pub model_matrix_0x2c: u32,
+    pub model_matrix_0x30: u32,
+    pub model_matrix_0x34: u32,
+    pub model_matrix_0x38: u32,
+    pub model_matrix_0x3c: u32,
+    pub model_matrix_0x40: u32,
+    pub model_matrix_0x44: u32,
+    pub model_matrix_0x48: u32,
+    pub model_matrix_0x4c: u32,
+    pub position: Position,
+    pub unknown0x5c: u32,
+    pub unknown0x60: u32,
+    pub unknown0x64: u32,
+    pub unknown0x68: u32,
+    pub unknown0x6c: u32,
+    pub unknown0x70: u32,
+    pub unknown0x74: u32,
+    pub unknown0x78: u32,
+    pub unknown0x7c: u32,
+    pub unknown0x80: u32,
+    pub unknown0x84: u32,
+    pub unknown0x88: u32,
+    pub unknown0x8c: u32,
+    pub unknown0x90: u16,
+    pub texture_offset_x: u8,
+    pub texture_offset_y: u8,
+    pub action_script_ref1: u32,
+    pub action_script_ref2: u32,
+    pub action_script_ref3: u32,
+}
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct Entity {
+    pub next_entity: u32,
+    pub update_method: u32,
+    pub id: u32,
+    pub unknown0xc: u32,
+    pub unknown0x10: u32,
+    pub unknown0x14: u16,
+    pub behavior_type: u16,
+    pub unknown0x18: u32,
+    pub unknown0x1c: u32,
+    pub unknown0x20: u16,
+    pub unknown0x22: u8,
+    pub map_marker: u8,
+    pub unknown0x24: u32,
+    pub model_data_ref: u32,
+    pub model_matrix_0x2c: u32,
+    pub model_matrix_0x30: u32,
+    pub model_matrix_0x34: u32,
+    pub model_matrix_0x38: u32,
+    pub model_matrix_0x3c: u32,
+    pub model_matrix_0x40: u32,
+    pub model_matrix_0x44: u32,
+    pub model_matrix_0x48: u32,
+    pub model_matrix_0x4c: u32,
+    pub position: Position,
+    pub unknown0x5c: u32,
+    pub unknown0x60: u32,
+    pub unknown0x64: u32,
+    pub unknown0x68: u32,
+    pub unknown0x6c: u32,
+    pub unknown0x70: u32,
+    pub unknown0x74: u32,
+    pub unknown0x78: u32,
+    pub unknown0x7c: u32,
+    pub unknown0x80: u32,
+    pub unknown0x84: u32,
+    pub unknown0x88: u32,
+    pub unknown0x8c: u32,
+    pub unknown0x90: u32,
+    pub unknown0x94: u32,
+    pub unknown0x98: u32,
+    pub unknown0x9c: u32,
+    pub unknown0xa0: u32,
+    pub unknown0xa4: u32,
+    pub unknown0xa8: u32,
+    pub unknown0xac: u32,
+    pub unknown0xb0: u32,
+    pub unknown0xb4: u32,
+    pub unknown0xb8: u32,
+    pub unknown0xbc: u32,
+    pub unknown0xc0: u32,
+    pub unknown0xc4: u32,
+    pub unknown0xc8: u32,
+    pub unknown0xcc: u32,
+    pub unknown0xd0: u32,
+    pub unknown0xd4: u32,
+    pub unknown0xd8: u32,
+    pub unknown0xdc: u32,
+    pub unknown0xe0: u32,
+    pub unknown0xe4: u32,
+    pub unknown0xe8: u32,
+    pub unknown0xec: u32,
+    pub unknown0xf0: u32,
+    pub unknown0xf4: u32,
+    pub unknown0xf8: u32,
+    pub unknown0xfc: u32,
+    pub unknown0x100: u32,
+    pub unknown0x104: u32,
+    pub unknown0x108: u32,
+    pub unknown0x10c: u32,
 }
