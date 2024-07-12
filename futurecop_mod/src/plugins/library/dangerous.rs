@@ -1,10 +1,12 @@
-use std::{arch::asm, sync::Arc};
+use std::{arch::asm, mem, sync::Arc};
 
 use anyhow::bail;
 use log::{debug, error, info, warn};
-use mlua::{Function, Lua, MultiValue};
+use mlua::{Function, Lua, MultiValue, UserData};
+use windows::Win32::System::Memory::{VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE};
 
 use crate::util::Hook;
+
 
 
 /// Supported types for lua to/from native conversion.
@@ -67,31 +69,52 @@ unsafe fn native_to_lua<'a>(lua: &'a Lua, lua_type: Type, raw_value: u32) -> Res
 
 /// Convert a lua value into its native representation given a specific lua type.
 unsafe fn lua_to_native<'a>(lua_type: Type, lua_value: &'a mlua::Value) -> Result<Vec<u32>, anyhow::Error> {
+  let actual_type_name = lua_value.type_name();
+
   let value: Vec<u32> = match lua_type {
     Type::Integer => match lua_value.as_u32() {
       Some(value) => vec![value],
-      None => bail!("value is not an integer"),
+      None => bail!("value {} is not an integer", actual_type_name),
     },
     Type::Float => match lua_value.as_f32() {
       Some(value) => vec![value as u32],
-      None => bail!("value is not a float"),
+      None => bail!("value {} is not a float", actual_type_name),
     }
     Type::Void => vec![0u32],
     Type::String => match lua_value.as_str() {
       Some(value) => {
         vec![value.as_ptr() as u32]
       },
-      None => bail!("value is not a string"),
+      None => bail!("value {} is not a string", actual_type_name),
     },
     Type::Byte => match lua_value.as_u32() {
       Some(value) => vec![value],
-      None => bail!("value is not a number")
+      None => bail!("value {} is not a number", actual_type_name)
     },
     Type::Short => match lua_value.as_u32() {
       Some(value) => vec![value],
-      None => bail!("value is not a number"),
+      None => bail!("value {} is not a number", actual_type_name),
     }
   };
+
+  Ok(value)
+}
+
+unsafe fn lua_to_native_implied<'a>(value: &'a mlua::Value) -> Result<Vec<u32>, anyhow::Error> {
+  let value: Vec<u32> = match value {
+    mlua::Value::Nil => vec![0u32],
+    mlua::Value::String(value) => {
+        vec![value.to_pointer() as u32]
+    }
+    mlua::Value::Number(value) => {
+      vec![*value as f32 as u32]
+    },
+    mlua::Value::Integer(value) => {
+      vec![*value as u32]
+    }
+    value => bail!("type {} is not supported", value.type_name()),
+  };
+
 
   Ok(value)
 }
@@ -109,6 +132,12 @@ pub fn create_dangerous_library(lua: Arc<Lua>) -> Result<mlua::OwnedTable, mlua:
 
   let read_fn = lua.create_function(read_memory_function)?;
   table.set("readMemory", read_fn)?;
+
+  let create_native_function_fn = lua.create_function(create_native_function_function)?;
+  table.set("createNativeFunction", create_native_function_fn)?;
+
+  let get_native_function_fn = lua.create_function(get_native_function)?;
+  table.set("getNativeFunction", get_native_function_fn)?;
 
   Ok(table.into_owned())
 }
@@ -206,7 +235,7 @@ fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_nam
           "push eax",
           "add {args}, 4",
           "sub {tmp}, 1",
-          "js 2b",
+          "ja 2b",
           "call {address}",
           "mov {tmp}, {len}",
           "shl {tmp}, 2",
@@ -299,30 +328,53 @@ fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_nam
 /// **Very unsafe**.
 /// 
 /// Wrong usage can easily lead to a panic.
-fn write_memory_function<'lua>(_: &'lua Lua, (address, byte_array): (u32, mlua::Table)) -> Result<(), mlua::Error> {
-  debug!("Write memory to {}, value: {:?}", address, byte_array);
+fn write_memory_function<'lua>(_: &'lua Lua, (address, data): (u32, mlua::Value)) -> Result<(), mlua::Error> {
+  debug!("Write memory to {}, value: {:?}", address, data);
 
   // Verify that the byte list if valid, before doing any unsafe operations
-  let mut bytes: Vec<u8> = Vec::new();
+  let bytes: Vec<u8> = match data {
+    mlua::Value::Table(byte_array) => {
+      debug!("Writing byte array");
+      // Lua array start with index 1
+      let mut index = 1;
 
-  // Lua array start with index 1
-  let mut index = 1;
+      let mut bytes: Vec<u8> = Vec::new();
+      while byte_array.contains_key(index)? {
+        let value: mlua::Value = byte_array.get(index)?;
 
-  while byte_array.contains_key(index)? {
-    let value: mlua::Value = byte_array.get(index)?;
+        match value {
+          mlua::Value::Integer(byte) => {
+            if byte < 0 || 0xff < byte {
+              return Err(mlua::Error::RuntimeError("supply the memory to write as a byte array (each item must be between 0 and 255".to_string()));
+            }
 
-    match value {
-      mlua::Value::Integer(byte) => {
-        if byte < 0 || 0xff < byte {
-          return Err(mlua::Error::RuntimeError("supply the memory to write as a byte array (each item must be between 0 and 255".to_string()));
+            bytes.push(byte as u8);
+          },
+          t => return Err(mlua::Error::RuntimeError(format!("unsupported argument, provide memory as a byte array. Expected array, got {:?}", t))),
         }
+        index += 1;
+      }
 
-        bytes.push(byte as u8);
-      },
-      t => return Err(mlua::Error::RuntimeError(format!("unsupported argument, provide memory as a byte array. Expected array, got {:?}", t))),
-    }
-    index += 1;
-  }
+      bytes
+    },
+    mlua::Value::Integer(value) => {
+      debug!("Writing integer");
+      value.to_le_bytes().to_vec()
+    },
+    mlua::Value::Number(value) => {
+      debug!("Writing number");
+      let value = value as f32;
+
+      value.to_le_bytes().to_vec()
+    },
+    mlua::Value::String(value) => {
+      debug!("Writing string");
+      value.as_bytes().to_vec()
+    },
+    _ => return Err(mlua::Error::RuntimeError("invalid argument. following types are supported: table, number, integer, string".to_string()))
+  };
+
+  debug!("Writing data: {:?}", bytes);
 
   let memory = address as *mut u8;
 
@@ -375,4 +427,277 @@ fn read_memory_function<'lua>(lua: &'lua Lua, (address, type_name): (u32, String
   }
 
   Ok(value)
+}
+
+struct NativeFunction {
+  // Generic native closure that wraps a lua function
+  address: u32,
+  arg_types: Vec<Type>,
+  return_type: Type,
+}
+
+impl NativeFunction {
+  pub fn new(address: u32, arg_types: Vec<Type>, return_type: Type) -> NativeFunction {
+    NativeFunction {
+      address,
+      arg_types,
+      return_type,
+    }
+  }
+
+  pub fn call<'lua>(&self, lua: &'lua Lua, args: mlua::MultiValue) -> Result<mlua::Value<'lua>, mlua::Error> {
+    let args = args.into_vec();
+
+    debug!("Calling function at address {:x} with ({:?}), expecting return type {:?}", self.address, args, self.return_type);
+
+    let mut arg_bytes: Vec<u32> = Vec::new();
+
+    for arg in args.iter().rev() {
+      let mut arg_byte = unsafe {lua_to_native_implied(&arg).map_err(|e| mlua::Error::RuntimeError(format!("could not convert lua value into bytes: {}", e.to_string())))?};
+      arg_bytes.append(&mut arg_byte);
+    }
+
+    let native_fn_address = self.address;
+
+    let raw_args = arg_bytes.as_ptr();
+    let arg_len = args.len();
+
+    unsafe {
+      let mut raw_response: u32 = 0;
+
+        // Call native function with arguments
+        // Use raw assembly because we don't know how many arguments we have at compile time
+        asm!(
+          "mov {tmp}, {len}",
+          "2:",
+          "mov eax, [{args}]",
+          "push eax",
+          "add {args}, 0x4",
+          "sub {tmp}, 0x1",
+          "ja 2b",  // Jumps if tmp is above zero
+          "call {address}",
+          "mov {tmp}, {len}",
+          "shl {tmp}, 0x2",
+          "add esp, {tmp}",
+          address = in(reg) native_fn_address,
+          len = in(reg) arg_len,
+          args = in(reg) raw_args,
+          tmp = out(reg) _,
+          out("eax") raw_response,
+        );
+
+      let lua_response = native_to_lua(lua, self.return_type, raw_response);
+
+      lua_response.map_err(|e| mlua::Error::RuntimeError(format!("could not convert return value into lua value: {}", e.to_string())))
+    }
+  }
+}
+
+impl UserData for NativeFunction {
+    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+      methods.add_method("getAddress", |_, native_function, ()| {
+        return Ok(native_function.address);
+      });
+
+      methods.add_method("call", |lua, native_function, args| {
+        debug!("Calling native function: 0x{:x}", native_function.address);
+        native_function.call(lua, args)
+      })
+    }
+}
+
+fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_type, lua_fn): (Vec<String>, String, mlua::Function)) -> Result<NativeFunction, mlua::Error> {
+  debug!("Creating native function with signature ({:?}) -> {:?}. Calls lua function: {:?}", arg_types, return_type, lua_fn);
+
+  let args_len = arg_types.len();
+
+  // Convert lua argument types
+  let mut lua_arg_types: Vec<Type> = Vec::new();
+
+  for arg_type in arg_types {
+    match Type::try_from_str(&arg_type) {
+      Some(arg_type) => lua_arg_types.push(arg_type),
+      None => return Err(mlua::Error::RuntimeError("unsupported argument type".to_string())),
+    }
+  }
+
+  let lua_arg_types_clone = lua_arg_types.clone();
+
+  // Convert lua return type
+  let lua_ret_type = match Type::try_from_str(&return_type) {
+    Some(value) => value,
+    None => return Err(mlua::Error::RuntimeError("unsupported return type".to_string())),
+  };
+
+  let lua_ret_type_clone = lua_ret_type.clone();
+
+  // Type must be explicitly set, otherwise, rust doesn't know what to when splitting the fat pointer
+  let native_closure: Box<dyn FnMut(u32) -> u32> = Box::new(move |args: u32| -> u32 {
+    debug!("Called native function");
+
+    let arg_pointer = &args as *const u32;
+
+    let mut lua_args: Vec<mlua::Value> = Vec::new();
+
+    for i in 0..lua_arg_types.len() {
+      let arg_type = lua_arg_types[i];
+
+      unsafe {
+        match native_to_lua(lua, arg_type, *arg_pointer.add(i)) {
+          Ok(value) => lua_args.push(value),
+          Err(e) => {
+            warn!("could not convert {} argument into lua value: {:?}", i, e);
+            panic!("could not convert raw argument into lua value: {:?}", e);
+          }
+        }
+      }
+    }
+
+    let return_value = match lua_fn.call::<_, mlua::Value>(mlua::MultiValue::from_vec(lua_args)) {
+      Ok(value) => value,
+      Err(e) => {
+        warn!("Lua function threw unexpected error: {:?}. Panicking...", e);
+        panic!("Lua function in native wrapper threw unexpected error: {:?}", e);
+      }
+    };
+
+    
+    let native_return_value = unsafe {
+      match lua_to_native(lua_ret_type, &return_value) {
+        Ok(value) => value,
+        Err(e) => {
+          warn!("could not convert lua return value into native value: {:?}. Panicking...", e);
+          panic!("could not convert lua return value into native value: {:?}", e);
+        }
+      }
+    };
+
+    native_return_value[0]
+  });
+
+  unsafe {
+  // Get the data and function pointer from the native closure
+    let raw_native_closure = Box::into_raw(native_closure);
+
+    let (data, vtable) = mem::transmute_copy::<_, (u32, *const u32)>(&raw_native_closure);
+    let native_address = *vtable.add(4);
+  
+    // This wrapper function handles the calling the native closure.
+    // The wrapper acts similar to a trampoline when hooking, therefore we must manually allocate and write the function
+    let closure_wrapper = VirtualAlloc(None, 100, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+
+    // Write the following assembly into the closure wrapper
+    // mov eax, {arg_len}
+    // mov ecx, esp
+    // mov edx, esp
+    // add ecx, eax
+    // loop:
+    // push dword [ecx]
+    // sub ecx, 0x4
+    // cmp ecx, edx
+    // jb loop
+    // push data
+    // call native_closure
+    // mov ecx, {arg_len + 0x4}
+    // add esp, ecx
+    // ret
+
+    let arg_len_in_bytes: u32 = args_len as u32 * 4;
+
+    let mut offset = 0;
+
+    // mov eax, {arg_len}
+    let store_args_in_eax_addr = closure_wrapper as *mut u8;
+    *store_args_in_eax_addr = 0xb8;
+    std::ptr::copy_nonoverlapping(&arg_len_in_bytes, store_args_in_eax_addr.add(1) as *mut u32, 1);
+    offset += 5;
+
+    // Insert static instructions
+    // mov ecx, esp
+    // add ecx, eax
+    // mov edx, esp
+    // loop:
+    // push dword [ecx]
+    // sub ecx, 0x4
+    // cmp edx, ecx
+    // jb loop
+    let start_and_loop_instructions: &[u8; 15] = &[
+      0x89, 0xe1, // mov ecx, esp
+      0x01, 0xc1, // add ecx, eax
+      0x89, 0xe2, // mov edx, esp 
+      0xff, 0x31, // loop: push dword [ecx]
+      0x83, 0xe9, 0x04, // sub ecx, 0x4
+      0x39, 0xca, // cmp edx, ecx
+      0x72, 0xf7  // jb loop
+    ];
+
+    let start_and_loop_addr = closure_wrapper.add(offset) as *mut u8;
+
+    for i in 0..start_and_loop_instructions.len() {
+      *(start_and_loop_addr.add(i)) = start_and_loop_instructions[i];
+    }
+    offset += start_and_loop_instructions.len();
+
+    // push data
+    let push_data_addr = closure_wrapper.add(offset) as *mut u8;
+    *push_data_addr = 0x68u8;
+    std::ptr::copy_nonoverlapping(&data, push_data_addr.add(1) as *mut u32, 1);
+    offset += 5;
+
+    // call native_closure
+    let jmp_src = closure_wrapper.add(offset + 5) as u32;
+    let jmp_dst = native_address;
+    let jmp_delta = jmp_dst as i32 - jmp_src as i32;
+    let call_closure_addr = closure_wrapper.add(offset) as *mut u8;
+    *call_closure_addr = 0xe8u8;
+    std::ptr::copy_nonoverlapping(&jmp_delta, call_closure_addr.add(1) as *mut i32, 1);
+    offset += 5;
+
+    // mov ecx, {arg_len+0x4}
+    let mov_arg_len_in_ecx_addr = closure_wrapper.add(offset) as *mut u8;
+    *mov_arg_len_in_ecx_addr = 0xb9u8;
+    let args_with_data_len = arg_len_in_bytes + 4;
+    std::ptr::copy_nonoverlapping(&args_with_data_len, mov_arg_len_in_ecx_addr.add(1) as *mut u32, 1);
+    offset += 5;
+
+    // End
+    // add esp, ecx,
+    // ret
+    let end_instructions: &[u8; 3] = &[
+      0x01, 0xcc, // add esp, ecx
+      0xc3, // ret
+    ];
+
+    let end_addr = closure_wrapper.add(offset) as *mut u8;
+
+    for i in 0..end_instructions.len() {
+      *(end_addr.add(i)) = end_instructions[i];
+    }
+
+
+    Ok(NativeFunction {
+      address: closure_wrapper as u32,
+      arg_types: lua_arg_types_clone,
+      return_type: lua_ret_type_clone,
+    })
+  }
+}
+
+fn get_native_function<'lua>(lua: &'lua Lua, (address, arg_types, return_type): (u32, Vec<String>, String)) -> Result<NativeFunction, mlua::Error> {
+  let mut lua_arg_types: Vec<Type> = Vec::new();
+  for arg_type in arg_types {
+    match Type::try_from_str(&arg_type) {
+      Some(value) => lua_arg_types.push(value),
+      None => return Err(mlua::Error::RuntimeError("unsupported argument type".to_string())),
+    }
+  }
+
+  let lua_ret_type = match Type::try_from_str(&return_type) {
+    Some(ret) => ret,
+    None => return Err(mlua::Error::RuntimeError("invalid return type".to_string())),
+  };
+
+  let native_function = NativeFunction::new(address, lua_arg_types, lua_ret_type);
+
+  Ok(native_function)
 }
