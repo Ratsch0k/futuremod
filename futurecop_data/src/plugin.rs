@@ -15,7 +15,7 @@ pub enum PluginDependency {
   // The following libraries are from the standard library
   Math,
   Table,
-  Bit,
+  Bit32,
   String,
   Utf8,
 }
@@ -30,7 +30,7 @@ impl Display for PluginDependency {
         PluginDependency::System => f.write_str("System"),
         PluginDependency::Math => f.write_str("Math"),
         PluginDependency::Table => f.write_str("Table"),
-        PluginDependency::Bit => f.write_str("Bit"),
+        PluginDependency::Bit32 => f.write_str("Bit32"),
         PluginDependency::String => f.write_str("String"),
         PluginDependency::Utf8 => f.write_str("Utf8")
       }
