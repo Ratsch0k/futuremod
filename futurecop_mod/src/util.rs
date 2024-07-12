@@ -251,45 +251,85 @@ impl Hook {
         // Write the jump address into the trampoline
         std::ptr::copy_nonoverlapping(&target_trampoline_delta, (target_trampoline as usize + prelude_size as usize + 1) as *mut isize, 1);
 
-        // Create the launchpad (function that calls the hook)
-        // Must contain the following assembly
-        // ```assembly
-        // pop eax
-        // pop ebx
+        // New approach
+        // Copy stack frame of caller without the actual return address.
+        // We cannot rely on ebp to determine the stack frame size, since I identified at least one
+        // function call where ebp is not used as a frame pointer.
+        // Instead, we use a static and hard-coded size of 50 addresses (200 bytes or 50 parameter).
+        // In the future, we might give the developer the option to determine size manually.
+        // Instead push the trampoline onto the stack.
+        // Then, call the hook.
+        // When the hook returns, clean the stack
+        // Otherwise, we cannot conform to calling conventions
+        // Assembly
+        // --------
+        // push ebx  // Store ebx to restore it later, ebx is used to hold the stack frame size to use after calling the hook.
+        //           // However, ebx is call-preserved so we must restore it before returning
+        // mov ebx, esp  // Store the target stack address in ebx
+        // add ebx, 0x4  // Ignore return address
+        // mov eax, esp  // Store source address to copy stack memory from in eax, is incremented in every iteration until it reaches ebx
+        // add eax, 0xc8
+        // loop:
+        // push [eax]  // Push one address from stack frame of caller to stack
+        // sub eax, 0x4  // Load next address
+        // cmp eax, ebx  // Check if target address reached (ebx)
+        // lt loop
         // push trampoline
         // push data
-        // push ebx
-        // push eax
-        // jmp hook
-        // ```
-        let hook_trampoline = VirtualAlloc(None, 20, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        // call closure_hook
+        // mov esp, ebx  // Clean up stack pointer
+        // add esp, 0x4
+        // pop ebx  // Restore ebx
+        // ret
+        let hook_trampoline = VirtualAlloc(None, 50, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 
-        let hook_trampoline_start: [u8; 2] = [0x58, 0x68];
+        let hook_trampoline_first: [u8; 23] = [0x53, 0x89, 0xe3, 0x83, 0xc3, 0x04, 0x89, 0xe0, 0x05, 0xc8, 0x00, 0x00, 0x00, 0xff, 0x30, 0x83, 0xe8, 0x04, 0x39, 0xd8, 0x7f, 0xf7, 0x68];
+        let hook_trampoline_second: [u8; 1] = [0xe8];
+        let hook_trampoline_third: [u8; 7] = [0x89, 0xdc, 0x83, 0xec, 0x04, 0x5b, 0xc3];
+
+        //let hook_trampoline_start: [u8; 2] = [0x5b, 0x68];
         let hook_trampoline_jump_address: u32 = target_trampoline as u32;
-        let hook_trampoline_jump: [u8; 2] = [0x50, 0xe9];
+        //let hook_trampoline_jump: [u8; 1] = [0xe8];
+        //let hook_trampoline_end: [u8; 5] = [0x83, 0xc4, 0x04, 0x53, 0xc3];
 
-        for i in 0..hook_trampoline_start.len() {
+        let mut current_offset = 0;
+
+        for i in 0..hook_trampoline_first.len() {
             let trampoline_address = hook_trampoline.add(i) as *mut u8;
-            *trampoline_address = hook_trampoline_start[i];
+            *trampoline_address = hook_trampoline_first[i];
         }
 
-        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_address, hook_trampoline.add(2) as *mut u32, 4);
+        current_offset += hook_trampoline_first.len();
 
-        *(hook_trampoline.add(6) as *mut u8) = 0x68;
-        
-        std::ptr::copy_nonoverlapping(&data, hook_trampoline.add(7) as *mut u32, 4);
+        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_address, hook_trampoline.add(current_offset) as *mut u32, 4);
+        current_offset += 4;
 
-        for i in 0..hook_trampoline_jump.len() {
-            let trampoline_address = hook_trampoline.add(11 + i) as *mut u8;
-            *trampoline_address = hook_trampoline_jump[i];
+        // Push data
+        let push_data_instruction_address = hook_trampoline.add(current_offset) as *mut u8;
+        *push_data_instruction_address = 0x68;
+        current_offset += 1;
+        std::ptr::copy_nonoverlapping(&data, hook_trampoline.add(current_offset) as *mut u32, 1);
+        current_offset += 4;
+
+        for i in 0..hook_trampoline_second.len() {
+            let trampoline_address = hook_trampoline.add(current_offset + i) as *mut u8;
+            *trampoline_address = hook_trampoline_second[i];
         }
+
+        current_offset += hook_trampoline_second.len();
 
         let hook_trampoline_jump_dst = hook_address;
-        let hook_trampoline_jump_src = hook_trampoline.add(17);
+        let hook_trampoline_jump_src = hook_trampoline.add(current_offset + 4);
         let hook_trampoline_jump_delta = hook_trampoline_jump_dst as isize - hook_trampoline_jump_src as isize;
 
-        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_delta, hook_trampoline.add(13) as *mut isize, 1);
+        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_delta, hook_trampoline.add(current_offset) as *mut isize, 1);
 
+        current_offset += 4;
+
+        for i in 0..hook_trampoline_third.len() {
+            let trampoline_address = hook_trampoline.add(current_offset + i) as *mut u8;
+            *trampoline_address = hook_trampoline_third[i];
+        }
 
         let jmp_dst = hook_trampoline;
         let jmp_src = inner.address as usize + 5;
