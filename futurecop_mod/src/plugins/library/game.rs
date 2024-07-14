@@ -1,6 +1,6 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
-use log::debug;
+use log::trace;
 use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, OwnedTable, UserData};
 use serde::Serialize;
 
@@ -197,7 +197,7 @@ pub fn create_game_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
   functions.set("getState", get_game_state)?;
 
   let get_player = lua.create_function(|_, player: u8| {
-    debug!("Getting player {}", player);
+    trace!("Getting player {}", player);
 
     if player > 1 {
       return Err(mlua::Error::RuntimeError("Can only get player one or two at the moment.".into()))

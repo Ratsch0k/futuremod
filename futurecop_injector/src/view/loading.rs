@@ -38,11 +38,11 @@ impl Loading {
 
     match mod_path.exists() {
       true => {
-        debug!("found mod file, checking if mode is active");
+        info!("found mod file, checking if mode is active");
         (Loading::WaitingForProgram{mod_path}, Command::perform(async {}, |_| Message::CheckIfStarted))
       }
       false => {
-        debug!("didn't found mod file, requesting user to select one");
+        info!("didn't found mod file, requesting user to select one");
         (Loading::NoPath, Command::none())
       }
     }
@@ -179,7 +179,7 @@ impl Loading {
     info!("Trying to inject mod");
     let config = get_config();
 
-    debug!("Getting handle to FutureCop process");
+    info!("Getting handle to FutureCop process");
     match get_future_cop_handle(config.require_admin) {
       Ok(optional_handle) => match optional_handle {
         Some(handle) => {

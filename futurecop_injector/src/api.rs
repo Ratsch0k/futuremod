@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use crate::config::get_config;
 use anyhow::anyhow;
-use log::debug;
+use log::info;
 use reqwest::Body;
 use serde::de::DeserializeOwned;
 use tokio::fs;
@@ -39,7 +39,7 @@ pub async fn is_mod_running() -> bool {
 }
 
 pub async fn reload_plugin(name: &str) -> Result<(), anyhow::Error> {
-  debug!("Reloading plugin: {}", name);
+  info!("Reloading plugin: {}", name);
 
   let mut body = HashMap::new();
   body.insert("name", name);

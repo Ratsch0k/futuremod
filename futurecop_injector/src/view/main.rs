@@ -1,5 +1,5 @@
 use iced::{alignment::{Horizontal, Vertical}, widget::{column, container, text}, Alignment, Command, Length};
-use log::debug;
+use log::trace;
 
 use crate::{config::get_config, log_subscriber::{self, LogRecord}, theme::{Button, Theme}, widget::{button, Element}};
 
@@ -50,7 +50,7 @@ impl Main {
     }
 
     pub fn update(&mut self, message: Message) -> iced::Command<Message> {
-        debug!("Handling message: {:?}", message);
+        trace!("Handling message: {:?}", message);
 
         match message {
             Message::LogEvent(message) => {

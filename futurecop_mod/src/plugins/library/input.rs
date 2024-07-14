@@ -132,7 +132,6 @@ fn insert_keycode(table: &mlua::Table, code: Keycode) -> Result<(), mlua::Error>
 
 
 pub fn create_input_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
-  debug!("Creating input library");
   let library = lua.create_table()?;
 
   // Insert supported key codes into library table.

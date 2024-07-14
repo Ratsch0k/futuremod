@@ -1,5 +1,5 @@
 use iced::{executor, font, Application, Command, Subscription};
-use log::debug;
+use log::trace;
 
 use crate::palette::Palette;
 use crate::{theme, widget::Element};
@@ -48,7 +48,7 @@ impl Application for ModInjector {
     }
 
     fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
-        debug!("Handling message: {:?}", message);
+        trace!("Handling message: {:?}", message);
 
         match self {
             ModInjector::Loading(loading) => {

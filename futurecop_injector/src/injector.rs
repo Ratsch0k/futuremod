@@ -1,6 +1,6 @@
 use std::{ffi::c_void, mem::size_of};
 
-use log::debug;
+use log::{debug, info};
 use windows::{core::PCSTR, Win32::{Foundation::{GetLastError, HANDLE}, Security::{GetTokenInformation, TokenElevation, TOKEN_ALL_ACCESS, TOKEN_ELEVATION}, System::{Diagnostics::{Debug::WriteProcessMemory, ToolHelp::{CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS}}, LibraryLoader::{GetModuleHandleA, GetProcAddress}, Memory::{VirtualAllocEx, MEM_COMMIT, PAGE_READWRITE}, Threading::{CreateRemoteThread, OpenProcess, OpenProcessToken, LPTHREAD_START_ROUTINE, PROCESS_ALL_ACCESS}}}};
 use anyhow::anyhow;
 
@@ -8,7 +8,7 @@ use super::config::get_config;
 
 
 pub fn get_pid() -> Result<Option<u32>, anyhow::Error> {
-  debug!("Get process id of process");
+  info!("Get process id of process");
   let config = get_config();
 
   unsafe {
@@ -44,7 +44,7 @@ pub fn get_pid() -> Result<Option<u32>, anyhow::Error> {
 }
 
 pub fn get_future_cop_handle(require_admin: bool) -> Result<Option<HANDLE>, anyhow::Error> {
-    debug!("Getting handle to futurecop process");
+    info!("Getting handle to futurecop process");
     let pid = match get_pid() {
         Ok(pid) => match pid {
                 Some(pid) => pid,
@@ -107,7 +107,7 @@ pub fn get_future_cop_handle(require_admin: bool) -> Result<Option<HANDLE>, anyh
 }
 
 pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::Error> {
-    debug!("Injecting mod");
+    info!("Injecting mod");
     unsafe {
         debug!("Allocating memory in process");
         let buffer = VirtualAllocEx(fcop_handle, None, mod_path.len() + 1, MEM_COMMIT, PAGE_READWRITE);
@@ -156,6 +156,6 @@ pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::E
         }
     }
 
-    debug!("Successfully injected mod");
+    info!("Successfully injected mod");
     Ok(())
 }

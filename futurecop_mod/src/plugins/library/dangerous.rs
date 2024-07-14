@@ -1,7 +1,7 @@
 use std::{arch::asm, mem, sync::Arc};
 
 use anyhow::bail;
-use log::{debug, error, info, warn};
+use log::{error, info, warn, trace};
 use mlua::{Function, Lua, MultiValue, UserData};
 use windows::Win32::System::Memory::{VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE};
 
@@ -177,7 +177,7 @@ fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_nam
     let mut hook = Hook::new(address);
 
     let hook_closure = move |original_fn: u32, args: u32| {
-      debug!("Called closure for hook of {:#08x}", address);
+      trace!("Called closure for hook of {:#08x}", address);
 
       let wrapper_return_type = hook_return_type.clone();
       let hook_return_type = hook_return_type.clone();
@@ -191,7 +191,7 @@ fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_nam
       // 2. Call the original function with the arguments
       // 3. Convert the return value back to a lua value and return it
       let original_wrapper = match lua.create_function::<_, mlua::Value, _>(move |lua, args: MultiValue| {
-        debug!("Lua called original function");
+        trace!("Lua called original function");
 
         // Convert the arguments from lua values into actual native values.
         let lua_args = args.into_vec();
@@ -329,12 +329,12 @@ fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_nam
 /// 
 /// Wrong usage can easily lead to a panic.
 fn write_memory_function<'lua>(_: &'lua Lua, (address, data): (u32, mlua::Value)) -> Result<(), mlua::Error> {
-  debug!("Write memory to {}, value: {:?}", address, data);
+  trace!("Write memory to {}, value: {:?}", address, data);
 
   // Verify that the byte list if valid, before doing any unsafe operations
   let bytes: Vec<u8> = match data {
     mlua::Value::Table(byte_array) => {
-      debug!("Writing byte array");
+      trace!("Writing byte array");
       // Lua array start with index 1
       let mut index = 1;
 
@@ -358,27 +358,27 @@ fn write_memory_function<'lua>(_: &'lua Lua, (address, data): (u32, mlua::Value)
       bytes
     },
     mlua::Value::Integer(value) => {
-      debug!("Writing integer");
+      trace!("Writing integer");
       value.to_le_bytes().to_vec()
     },
     mlua::Value::Number(value) => {
-      debug!("Writing number");
+      trace!("Writing number");
       let value = value as f32;
 
       value.to_le_bytes().to_vec()
     },
     mlua::Value::String(value) => {
-      debug!("Writing string");
+      trace!("Writing string");
       value.as_bytes().to_vec()
     },
     _ => return Err(mlua::Error::RuntimeError("invalid argument. following types are supported: table, number, integer, string".to_string()))
   };
 
-  debug!("Writing data: {:?}", bytes);
+  trace!("Writing data: {:?}", bytes);
 
   let memory = address as *mut u8;
 
-  debug!("Writing {:?} to {}", bytes, address);
+  trace!("Writing {:?} to {}", bytes, address);
   unsafe {
     for index in 0..bytes.len() {
       let address_to_write = memory.add(index);
@@ -393,7 +393,7 @@ fn write_memory_function<'lua>(_: &'lua Lua, (address, data): (u32, mlua::Value)
 
 /// Read any memory address and convert it to the given type in lua.
 fn read_memory_function<'lua>(lua: &'lua Lua, (address, type_name): (u32, String)) -> Result<mlua::Value<'lua>, mlua::Error> {
-  debug!("Read memory address {} with type {}", address, type_name);
+  trace!("Read memory address {} with type {}", address, type_name);
   let value_type = match Type::try_from_str(type_name.as_str()) {
     Some(t) => t,
     None => return Err(mlua::Error::RuntimeError("unsupported type".to_string()))
@@ -448,7 +448,7 @@ impl NativeFunction {
   pub fn call<'lua>(&self, lua: &'lua Lua, args: mlua::MultiValue) -> Result<mlua::Value<'lua>, mlua::Error> {
     let args = args.into_vec();
 
-    debug!("Calling function at address {:x} with ({:?}), expecting return type {:?}", self.address, args, self.return_type);
+    trace!("Calling function at address {:x} with ({:?}), expecting return type {:?}", self.address, args, self.return_type);
 
     let mut arg_bytes: Vec<u32> = Vec::new();
 
@@ -501,14 +501,14 @@ impl UserData for NativeFunction {
       });
 
       methods.add_method("call", |lua, native_function, args| {
-        debug!("Calling native function: 0x{:x}", native_function.address);
+        trace!("Calling native function: 0x{:x}", native_function.address);
         native_function.call(lua, args)
       })
     }
 }
 
 fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_type, lua_fn): (Vec<String>, String, mlua::Function)) -> Result<NativeFunction, mlua::Error> {
-  debug!("Creating native function with signature ({:?}) -> {:?}. Calls lua function: {:?}", arg_types, return_type, lua_fn);
+  trace!("Creating native function with signature ({:?}) -> {:?}. Calls lua function: {:?}", arg_types, return_type, lua_fn);
 
   let args_len = arg_types.len();
 
@@ -534,7 +534,7 @@ fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_type
 
   // Type must be explicitly set, otherwise, rust doesn't know what to when splitting the fat pointer
   let native_closure: Box<dyn FnMut(u32) -> u32> = Box::new(move |args: u32| -> u32 {
-    debug!("Called native function");
+    trace!("Called native function");
 
     let arg_pointer = &args as *const u32;
 

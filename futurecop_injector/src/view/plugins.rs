@@ -199,13 +199,13 @@ impl Plugins {
             }
           },
           Message::ClearError => {
-            debug!("Clearing error");
+            info!("Clearing error");
             plugins_view.error = None;
 
             Command::none()
           },
           Message::UninstallPlugin(plugin_name) => {
-            debug!("Uninstalling plugin '{}'", plugin_name);
+            info!("Uninstalling plugin '{}'", plugin_name);
 
             Command::perform(async {
               uninstall_plugin(plugin_name.clone()).await.map_err(|e| e.to_string())?;
@@ -215,7 +215,7 @@ impl Plugins {
           Message::UninstallPluginResponse(result) => {
             match result {
               Ok(name) => {
-                debug!("Successfully uninstalled plugin '{}'", name);
+                info!("Successfully uninstalled plugin '{}'", name);
 
                 let _ = plugins_view.plugins.remove(&name);
                 if plugins_view.selected_plugin.as_ref().is_some_and(|v| *v == name) {
