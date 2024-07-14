@@ -3,7 +3,7 @@ use std::{cell::OnceCell, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, tim
 use log::*;
 use num;
 use windows::{Win32::System::Diagnostics::Debug::OutputDebugStringA, core::{PCSTR, s}, Win32::UI::Input::KeyboardAndMouse::*};
-use crate::{api::graphics::{self, EXAMPLE_ITEM}, config::Config, futurecop::*, input::KeyState, plugins::plugin_manager::GlobalPluginManager};
+use crate::{api::graphics::{self, EXAMPLE_ITEM}, config::Config, futurecop::*, input::KeyState, plugins::plugin_manager::GlobalPluginManager, util::resume_all_threads};
 use crate::futurecop::global::*;
 use crate::util::install_hook;
 use crate::{plugins::PluginManager, util::Hook};
@@ -59,6 +59,12 @@ pub fn main(config: Config) {
     }
 
     server::start_server(config);
+
+    // Now resume the game
+    if let Err(e) = resume_all_threads() {
+        error!("Could not resume threads: {}", e);
+        panic!("Could not resume threads: {}", e);
+    }
 
     mod_loop();
 }

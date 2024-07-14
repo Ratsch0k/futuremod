@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use config::Config;
 use fern::Output;
 use log::Log;
+use util::suspend_all_other_threads;
 use windows::{ Win32::Foundation::*, Win32::System::SystemServices::*, Win32::System::Diagnostics::Debug::*, Win32::System::Threading::*, core::{s, PCSTR}};
 mod futurecop;
 mod config;
@@ -99,6 +100,11 @@ unsafe extern "system" fn main(_: *mut c_void) -> u32 {
             OutputDebugStringA(PCSTR(format!("Error while setting up logging: {}\0", e).as_ptr()));
         }
         _ => (),
+    }
+
+    if let Err(e) = suspend_all_other_threads() {
+        OutputDebugStringA(PCSTR::from_raw(format!("Could not suspend all other thread: {}", e).as_ptr()));
+        panic!("Could not suspend all other threads: {}", e);
     }
     
     entry::main(config);

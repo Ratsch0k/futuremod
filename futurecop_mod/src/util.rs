@@ -1,7 +1,8 @@
-use std::{collections::HashMap, ffi::c_void, mem, sync::{Arc, Mutex}};
-use log::{debug, error};
-use windows::Win32::System::Memory::*;
+use std::{collections::HashMap, ffi::c_void, mem::{self, size_of}, sync::{Arc, Mutex}};
+use log::{debug, error, info, warn};
+use windows::Win32::{Foundation::CloseHandle, System::{Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Thread32First, Thread32Next, TH32CS_SNAPTHREAD, THREADENTRY32}, Memory::*, Threading::{GetCurrentProcessId, GetCurrentThreadId, OpenThread, ResumeThread, SuspendThread, THREAD_ALL_ACCESS}}};
 use iced_x86::{Code, Decoder, DecoderOptions};
+use anyhow::{anyhow, bail};
 
 lazy_static!{
     static ref HOOKS: Arc<Mutex<HashMap<u32, Arc<Mutex<Inner>>>>> = Arc::new(Mutex::new(HashMap::new()));
@@ -620,4 +621,108 @@ impl Hook {
 
         Ok(())
     }
+}
+
+/// Get all current threads of FutureCop except the caller.
+pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
+    info!("Get other threads of process");
+    
+    unsafe {
+        // Get thread and process id of current thread
+        // Is used later to identify what threads belong to this process
+        let own_thread_id = GetCurrentThreadId();
+        let own_process_id = GetCurrentProcessId();
+
+        info!("Get thread snapshot");
+
+        // Get snapshot of threads. Used to iterate through all threads
+        let thread_snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+            .map_err(|e| anyhow!("Could not get thread snapshot: {}", e))?;
+
+        let close_thread_snap_handle = || -> Result<(), anyhow::Error> {
+            CloseHandle(thread_snap).map_err(|e| anyhow!("Could not close handle to thread snapshot: {}", e))
+        };
+
+        // Get the first thread in the thread snapshots
+        let mut thread_entry: THREADENTRY32 = Default::default();
+        thread_entry.dwSize = size_of::<THREADENTRY32>() as u32;
+
+        info!("Get first thread");
+
+        if let Err(e) = Thread32First(thread_snap, &mut thread_entry) {
+            close_thread_snap_handle()?;
+            bail!("Could not get info about first thread: {}", e);
+        }
+
+        let mut threads: Vec<THREADENTRY32> = Vec::new();
+
+        info!("Iterate through threads");
+        // Iterate through all threads and collect them
+        loop {
+            info!("Checking thread PID={}, TID={}", thread_entry.th32OwnerProcessID, thread_entry.th32ThreadID);
+            if thread_entry.th32OwnerProcessID == own_process_id && thread_entry.th32ThreadID != own_thread_id {
+                info!("Found thread {}", thread_entry.th32ThreadID);
+
+                threads.push(thread_entry.clone());
+            }
+
+            // Get the next thread in the thread snapshot
+            if let Err(_) = Thread32Next(thread_snap, &mut thread_entry) {
+                break
+            }
+        }
+
+        close_thread_snap_handle()?;
+
+        Ok(threads)
+    }
+}
+
+/// Suspend all currently running threads of FutureCop except the thread of the caller.
+pub fn suspend_all_other_threads() -> Result<(), anyhow::Error> {
+    info!("Suspend all other threads");
+    unsafe {
+        let threads = get_other_threads()?;
+
+        for thread in threads {
+            let thread_handle = OpenThread(THREAD_ALL_ACCESS, false, thread.th32ThreadID)
+                .map_err(|e| anyhow!("Could not get handle to thread {}: {}", thread.th32ThreadID, e))?;
+
+            info!("Got thread {}, suspending", thread.th32ThreadID);
+
+            // Suspend the thread
+            SuspendThread(thread_handle);
+
+            if let Err(e) = CloseHandle(thread_handle) {
+                warn!("Could not close handle to thread {}: {}", thread.th32ThreadID, e);
+            }
+        }
+    }
+
+    info!("Suspended all threads");
+
+    Ok(())
+}
+
+/// Resume all threads of FutureCop.
+pub fn resume_all_threads() -> Result<(), anyhow::Error> {
+    info!("Resume all threads");
+    let threads = get_other_threads()?;
+
+    unsafe {
+        for thread in threads {
+            let thread_handle = OpenThread(THREAD_ALL_ACCESS, false, thread.th32ThreadID)
+                .map_err(|e| anyhow!("Could not get handle to thread {}: {}", thread.th32ThreadID, e))?;
+
+            info!("Resume thread {}", thread.th32ThreadID);
+            ResumeThread(thread_handle);
+
+            // If we can't close the handle, don't stop, just print a warning
+            if let Err(e) = CloseHandle(thread_handle) {
+                warn!("Could not close handle to thread {}: {}", thread.th32ThreadID, e);
+            }
+        }
+    }
+
+    Ok(())
 }
