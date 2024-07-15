@@ -5,6 +5,7 @@ local math = require("math")
 local customBehaviorFunctionNative = nil
 local behaviorA0Function = nil
 local renderObject = nil
+local entityDefinition = nil
 
 local instances = {}
 
@@ -19,31 +20,32 @@ function healingStationInit(event, obj, dataRefs, arg4)
   -- Initialize rest of the behavior data
   local secondModelRef = getSecondObjectRefFromDataRefs(dataRefs)
 
-  dangerous.writeMemory(obj + 0xa0, secondModelRef)
-  dangerous.writeMemory(obj + 0xa4, 0x010000)
-  dangerous.writeMemory(obj + 0xa8, 0)
-  dangerous.writeMemory(obj + 0xac, 0)
-  dangerous.writeMemory(obj + 0xb0, 0)
-  dangerous.writeMemory(obj + 0xb4, 0x010000)
-  dangerous.writeMemory(obj + 0xb8, 0)
-  dangerous.writeMemory(obj + 0xbc, 0)
-  dangerous.writeMemory(obj + 0xc0, 0)
-  dangerous.writeMemory(obj + 0xc4, 0x010000)
+  local entity = entityDefinition:cast(obj)
 
-  local basePositionAddr = obj + 0x50
-  local posX = dangerous.readMemory(basePositionAddr, "int")
-  local posY = dangerous.readMemory(basePositionAddr + 0x4, "int")
-  local posZ = dangerous.readMemory(basePositionAddr + 0x8, "int")
+  entity.secondModelRef = secondModelRef
+  entity.matrixM11 = 0x010000
+  entity.matrixM12 = 0
+  entity.matrixM13 = 0
+  entity.matrixM21 = 0
+  entity.matrixM22 = 0x010000
+  entity.matrixM23 = 0
+  entity.matrixM31 = 0
+  entity.matrixM32 = 0
+  entity.matrixM33 = 0x010000
 
   -- Change texture offset to change appearance of station
-  dangerous.writeMemory(obj + 0x92, {0x90})
+  entity.textureOffset = 0x90
 
-  dangerous.writeMemory(obj + 0xc8, posX)
-  dangerous.writeMemory(obj + 0xcc, posY + 0xd00)
-  dangerous.writeMemory(obj + 0xd0, posZ)
-  dangerous.writeMemory(obj + 0xd4, posX)
-  dangerous.writeMemory(obj + 0xd8, posY + 0xd00)
-  dangerous.writeMemory(obj + 0xdc, posZ)
+  local posX = entity.posX
+  local posY = entity.posY
+  local posZ = entity.posZ
+
+  entity.secondPosX = posX
+  entity.secondPosY = posY + 0xd00
+  entity.secondPosZ = posZ
+  entity.thirdPosX = posX
+  entity.thirdPosY = posY + 0xd00
+  entity.thirdPosZ = posZ
 
   -- We don't have to store everything about an object in native memory
   -- By referencing the object's ids we can manage some of the state in lua
@@ -187,6 +189,28 @@ function getBehaviorFunctionHook(original, entityType)
 end
 
 function onLoad()
+  entityDefinition = dangerous.createNativeStructDefinition({
+    posX={type="int",offset=0x50},
+    posY={type="int",offset=0x54},
+    posZ={type="int",offset=0x58},
+    textureOffset={type="byte",offset=0x90},
+    secondModelRef={type="int",offset=0xa0},
+    matrixM11={type="int",offset=0xa4},
+    matrixM12={type="int",offset=0xa8},
+    matrixM13={type="int",offset=0xac},
+    matrixM21={type="int",offset=0xb0},
+    matrixM22={type="int",offset=0xb4},
+    matrixM23={type="int",offset=0xb8},
+    matrixM31={type="int",offset=0xbc},
+    matrixM32={type="int",offset=0xc0},
+    matrixM33={type="int",offset=0xc4},
+    secondPosX={type="int",offset=0xc8},
+    secondPosY={type="int",offset=0xcc},
+    secondPosZ={type="int",offset=0xd0},
+    thirdPosX={type="int",offset=0xc8},
+    thirdPosY={type="int",offset=0xcc},
+    thirdPosZ={type="int",offset=0xd0},
+  })
   behaviorA0Function = dangerous.getNativeFunction(0x0041a420, {"int", "int", "int", "int"}, "int");
   renderObject = dangerous.getNativeFunction(0x004280a0, {"int", "int", "int"}, "int")
   customBehaviorFunctionNative = dangerous.createNativeFunction({"int", "int", "int", "int"}, "int", customBehaviorFunction)
