@@ -33,7 +33,7 @@ type MissionGameLoop = fn() -> ();
 pub fn main(config: Config) {
     unsafe {
         ORIGINAL_PLAYER_METHOD = install_hook(0x00446800, player_method);
-        //FIRST_MISSION_GAME_LOOP_FUNCTION = install_hook(FUN_00406a30_ADDRESS, first_mission_game_loop_function);
+
         let mut hook = Hook::new(FUN_00406A30_ADDRESS);
         let _ = hook.stack_aware_set_hook(first_mission_game_loop_function as u32).map_err(|_| warn!("Could not hook game loop"));
 
@@ -69,34 +69,6 @@ pub fn main(config: Config) {
     mod_loop();
 }
 
-type LoadNextAsset = fn(u8) -> u32;
-fn load_next_mission_asset(o: LoadNextAsset, allow_file_read: u8) -> u32 {
-    info!("Loading next asset with allow_file_read={}", allow_file_read);
-    let potential_asset_ptr = o(allow_file_read);
-    info!("Loaded next asset: {:x}", potential_asset_ptr);
-
-    unsafe {
-        if potential_asset_ptr != 0 {
-            info!("Parsing returned asset");
-            let potential_asset_ptr = potential_asset_ptr as *const u32;
-
-            let asset_type = {
-                let asset_type_raw = *potential_asset_ptr.offset(6);
-
-                String::from_utf8(asset_type_raw.to_le_bytes().to_vec()).unwrap_or(format!("{:x} (could not parse)", asset_type_raw))
-            };
-            let asset_id = *potential_asset_ptr.offset(7);
-
-            info!("Loaded asset with type={} and id=0x{:x}", asset_type, asset_id);
-        } else {
-            info!("Loading asset returned null pointer");
-        }
-    }
-
-    potential_asset_ptr
-}
-
-
 fn first_mission_game_loop_function(o: MissionGameLoop) {
     // Update the current key state
     let key_states = KeyState::new();
@@ -125,6 +97,30 @@ fn is_key_pressed(vkey: i32) -> bool {
         unsafe {key_state = GetAsyncKeyState(vkey)};
 
         return key_state != 0;
+}
+
+/// Mod infinite loop.
+/// 
+/// As long as no plugin exists to allow sprinting, this function is used for simple implementation
+/// of a sprinting mod.
+/// Every 10 ms set the player's acceleration to a higher values based on the current values.
+/// This is janky implementation as we are not actually hooking into player's movement
+/// function and instead hope that our function overrides the acceleration after the game's logic
+/// clamped it and before the game moved the player.
+pub fn mod_loop() {
+    loop {
+        unsafe {
+            if FIRST_PLAYER.is_some() {
+                handle_player_sprint(1, &mut *FIRST_PLAYER.unwrap())
+            }
+
+            if SECOND_PLAYER.is_some() {
+                handle_player_sprint(2, &mut *SECOND_PLAYER.unwrap())
+            }
+        }
+
+        thread::sleep(time::Duration::from_millis(10));
+    }
 }
 
 fn handle_player_sprint(player_id: u8, player_entity: &mut PlayerEntity) {
@@ -164,38 +160,6 @@ fn handle_player_sprint(player_id: u8, player_entity: &mut PlayerEntity) {
 
         player.acceleration_x = new_vel_x as i32;
         player.acceleration_y = new_vel_y as i32;
-    }
-}
-
-/// Mod infinite loop.
-/// 
-/// As long as no plugin exists to allow sprinting, this function is used for simple implementation
-/// of a sprinting mod.
-/// Every 10 ms set the player's acceleration to a higher values based on the current values.
-/// This is janky implementation as we are not actually hooking into player's movement
-/// function and instead hope that our function overrides the acceleration after the game's logic
-/// clamped it and before the game moved the player.
-pub fn mod_loop() {
-    loop {
-        unsafe {
-            if FIRST_PLAYER.is_some() {
-                handle_player_sprint(1, &mut *FIRST_PLAYER.unwrap())
-            }
-
-            if SECOND_PLAYER.is_some() {
-                handle_player_sprint(2, &mut *SECOND_PLAYER.unwrap())
-            }
-        }
-
-        thread::sleep(time::Duration::from_millis(10));
-    }
-}
-
-unsafe fn menu_loop_hook(time_delta: i32) {
-    OutputDebugStringA(PCSTR(format!("GameLoop({})\n\0", time_delta).as_ptr()));
-    match ORIGINAL_MENU_LOOP {
-        Some(f) => f(time_delta),
-        None => OutputDebugStringA(s!("OriginalGameLoop function not found"))
     }
 }
 
