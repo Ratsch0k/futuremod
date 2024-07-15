@@ -1,8 +1,8 @@
-use std::{arch::asm, mem, sync::Arc};
+use std::{arch::asm, collections::HashMap, mem, sync::Arc};
 
-use anyhow::bail;
-use log::{error, info, warn, trace};
-use mlua::{Function, Lua, MultiValue, UserData};
+use anyhow::{anyhow, bail};
+use log::{debug, error, info, warn};
+use mlua::{Function, Lua, MetaMethod, MultiValue, UserData};
 use windows::Win32::System::Memory::{VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE};
 
 use crate::util::Hook;
@@ -139,6 +139,12 @@ pub fn create_dangerous_library(lua: Arc<Lua>) -> Result<mlua::OwnedTable, mlua:
   let get_native_function_fn = lua.create_function(get_native_function)?;
   table.set("getNativeFunction", get_native_function_fn)?;
 
+  let create_native_struct_definition = lua.create_function(create_native_struct_definition_fn)?;
+  table.set("createNativeStructDefinition", create_native_struct_definition)?;
+
+  let create_native_struct = lua.create_function(create_native_struct_fn)?;
+  table.set("createNativeStruct", create_native_struct)?;
+
   Ok(table.into_owned())
 }
 
@@ -177,7 +183,7 @@ fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_nam
     let mut hook = Hook::new(address);
 
     let hook_closure = move |original_fn: u32, args: u32| {
-      trace!("Called closure for hook of {:#08x}", address);
+      debug!("Called closure for hook of {:#08x}", address);
 
       let wrapper_return_type = hook_return_type.clone();
       let hook_return_type = hook_return_type.clone();
@@ -191,7 +197,7 @@ fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_nam
       // 2. Call the original function with the arguments
       // 3. Convert the return value back to a lua value and return it
       let original_wrapper = match lua.create_function::<_, mlua::Value, _>(move |lua, args: MultiValue| {
-        trace!("Lua called original function");
+        debug!("Lua called original function");
 
         // Convert the arguments from lua values into actual native values.
         let lua_args = args.into_vec();
@@ -329,12 +335,12 @@ fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_nam
 /// 
 /// Wrong usage can easily lead to a panic.
 fn write_memory_function<'lua>(_: &'lua Lua, (address, data): (u32, mlua::Value)) -> Result<(), mlua::Error> {
-  trace!("Write memory to {}, value: {:?}", address, data);
+  debug!("Write memory to {}, value: {:?}", address, data);
 
   // Verify that the byte list if valid, before doing any unsafe operations
   let bytes: Vec<u8> = match data {
     mlua::Value::Table(byte_array) => {
-      trace!("Writing byte array");
+      debug!("Writing byte array");
       // Lua array start with index 1
       let mut index = 1;
 
@@ -358,27 +364,27 @@ fn write_memory_function<'lua>(_: &'lua Lua, (address, data): (u32, mlua::Value)
       bytes
     },
     mlua::Value::Integer(value) => {
-      trace!("Writing integer");
+      debug!("Writing integer");
       value.to_le_bytes().to_vec()
     },
     mlua::Value::Number(value) => {
-      trace!("Writing number");
+      debug!("Writing number");
       let value = value as f32;
 
       value.to_le_bytes().to_vec()
     },
     mlua::Value::String(value) => {
-      trace!("Writing string");
+      debug!("Writing string");
       value.as_bytes().to_vec()
     },
     _ => return Err(mlua::Error::RuntimeError("invalid argument. following types are supported: table, number, integer, string".to_string()))
   };
 
-  trace!("Writing data: {:?}", bytes);
+  debug!("Writing data: {:?}", bytes);
 
   let memory = address as *mut u8;
 
-  trace!("Writing {:?} to {}", bytes, address);
+  debug!("Writing {:?} to {}", bytes, address);
   unsafe {
     for index in 0..bytes.len() {
       let address_to_write = memory.add(index);
@@ -393,7 +399,7 @@ fn write_memory_function<'lua>(_: &'lua Lua, (address, data): (u32, mlua::Value)
 
 /// Read any memory address and convert it to the given type in lua.
 fn read_memory_function<'lua>(lua: &'lua Lua, (address, type_name): (u32, String)) -> Result<mlua::Value<'lua>, mlua::Error> {
-  trace!("Read memory address {} with type {}", address, type_name);
+  debug!("Read memory address {} with type {}", address, type_name);
   let value_type = match Type::try_from_str(type_name.as_str()) {
     Some(t) => t,
     None => return Err(mlua::Error::RuntimeError("unsupported type".to_string()))
@@ -448,7 +454,7 @@ impl NativeFunction {
   pub fn call<'lua>(&self, lua: &'lua Lua, args: mlua::MultiValue) -> Result<mlua::Value<'lua>, mlua::Error> {
     let args = args.into_vec();
 
-    trace!("Calling function at address {:x} with ({:?}), expecting return type {:?}", self.address, args, self.return_type);
+    debug!("Calling function at address {:x} with ({:?}), expecting return type {:?}", self.address, args, self.return_type);
 
     let mut arg_bytes: Vec<u32> = Vec::new();
 
@@ -501,14 +507,14 @@ impl UserData for NativeFunction {
       });
 
       methods.add_method("call", |lua, native_function, args| {
-        trace!("Calling native function: 0x{:x}", native_function.address);
+        debug!("Calling native function: 0x{:x}", native_function.address);
         native_function.call(lua, args)
       })
     }
 }
 
 fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_type, lua_fn): (Vec<String>, String, mlua::Function)) -> Result<NativeFunction, mlua::Error> {
-  trace!("Creating native function with signature ({:?}) -> {:?}. Calls lua function: {:?}", arg_types, return_type, lua_fn);
+  debug!("Creating native function with signature ({:?}) -> {:?}. Calls lua function: {:?}", arg_types, return_type, lua_fn);
 
   let args_len = arg_types.len();
 
@@ -534,7 +540,7 @@ fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_type
 
   // Type must be explicitly set, otherwise, rust doesn't know what to when splitting the fat pointer
   let native_closure: Box<dyn FnMut(u32) -> u32> = Box::new(move |args: u32| -> u32 {
-    trace!("Called native function");
+    debug!("Called native function");
 
     let arg_pointer = &args as *const u32;
 
@@ -701,4 +707,163 @@ fn get_native_function<'lua>(_: &'lua Lua, (address, arg_types, return_type): (u
   let native_function = NativeFunction::new(address, lua_arg_types, lua_ret_type);
 
   Ok(native_function)
+}
+
+
+#[derive(Debug, Clone)]
+struct NativeStructField {
+  pub offset: u32,
+  pub native_type: Type,
+}
+
+#[derive(Debug, Clone)]
+struct NativeStruct {
+  fields: HashMap<String, NativeStructField>,
+  address: u32,
+}
+
+impl UserData for NativeStruct {
+    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {      
+      methods.add_meta_method(MetaMethod::Index, |lua, native_struct, field: String| -> Result<mlua::Value, mlua::Error> {
+        debug!("Getting field {} from native struct at 0x{:x}", field, native_struct.address);
+        let native_field = match native_struct.fields.get(&field) {
+          Some(field) => field,
+          None => {
+            debug!("Native struct at 0x{:x} doesn't have field {}", native_struct.address, field);
+            return Ok(mlua::Nil);
+          },
+        };
+
+        let field_ptr = (native_struct.address + native_field.offset) as *const u32;
+
+        unsafe {
+          let value = *field_ptr;
+          native_to_lua(lua, native_field.native_type, value)
+        }
+      });
+
+      methods.add_meta_method(MetaMethod::NewIndex, |_, native_struct, (field, value): (String, mlua::Value)| -> Result<(), mlua::Error> {
+        debug!("Set field {} of struct at 0x{:x} to {:?}", field, native_struct.address, value);
+
+        let native_field = match native_struct.fields.get(&field) {
+          Some(field) => field,
+          None => {
+            debug!("Struct at 0x{:x} doesn't have field {}", native_struct.address, field);
+            return Err(mlua::Error::RuntimeError("Field doesn't exist".to_string()))
+          }
+        };
+
+        let native_value = unsafe {
+          lua_to_native(native_field.native_type, &value)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Could not convert lua value into native: {}", e)))?
+        };
+
+        // Report if the lua value was converted into more bytes than expected
+        if native_value.len() > 1 {
+          debug!("Converted lua value is larger than one double word: {:?}", value);
+        }
+
+        let field_addr = native_struct.address + native_field.offset;
+
+        match native_field.native_type {
+          Type::Byte => {
+            let field_ptr = field_addr as *mut u8;
+
+            unsafe {
+              *field_ptr = native_value[0] as u8;
+            }
+          },
+          Type::Short => {
+            let field_ptr = field_addr as *mut u16;
+
+            unsafe {
+              *field_ptr = native_value[0] as u16;
+            }
+          },
+          _ => {
+            let field_ptr = field_addr as *mut u32;
+
+            // Only copy the first double word into the field
+            unsafe {
+              *field_ptr = native_value[0];
+            }
+          }
+        }
+
+        Ok(())
+      });
+    }
+}
+
+#[derive(Debug, Clone)]
+struct NativeStructDefinition {
+  fields: HashMap<String, NativeStructField>
+}
+
+impl NativeStructDefinition {
+  pub fn new(fields: mlua::Table) -> Result<NativeStructDefinition, anyhow::Error> {
+    debug!("Create new native struct definition");
+
+    let mut native_fields: HashMap<String, NativeStructField> = HashMap::new();
+  
+    for pair in fields.pairs::<String, mlua::Table>() {
+      let (key, field_definition) = match pair {
+        Ok(pair) => pair,
+        Err(e) => {
+          debug!("Field definition has invalid type");
+          bail!("Field definition must be a table: {}", e);
+        }
+      };
+  
+      let offset: u32 = field_definition.get("offset").map_err(|_| anyhow!("Field definition of {} is missing 'offset'", key))?;
+      let native_type = {
+        let native_type_str: String = field_definition.get("type")
+          .map_err(|_| mlua::Error::RuntimeError(format!("Field definition of {} is missing 'type'", key)))?;
+  
+        match Type::try_from_str(&native_type_str) {
+          Some(value) => value,
+          None => {
+            debug!("Field {} has an invalid type", key);
+            bail!("Field {} has an invalid type", key);
+          },
+        }
+      };
+  
+      native_fields.insert(key, NativeStructField {
+        offset,
+        native_type,
+      });
+    }
+  
+    Ok(NativeStructDefinition{
+      fields: native_fields,
+    })
+  }
+}
+
+impl UserData for NativeStructDefinition {
+    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+      methods.add_method("cast", |_, definition, address: u32| -> Result<NativeStruct, mlua::Error> {
+        Ok(NativeStruct {
+          fields: definition.fields.clone(),
+          address,
+        })
+      });
+    }
+}
+
+fn create_native_struct_definition_fn<'lua>(_: &'lua Lua, fields: mlua::Table) -> Result<NativeStructDefinition, mlua::Error> {
+  NativeStructDefinition::new(fields).map_err(|e| mlua::Error::RuntimeError(e.to_string()))
+}
+
+fn create_native_struct_fn<'lua>(_: &'lua Lua, (address, fields): (u32, mlua::Table)) -> Result<NativeStruct, mlua::Error> {
+  debug!("Create new native struct at 0x{:x}", address);
+
+  let definition = NativeStructDefinition::new(fields)
+    .map_err(|e| mlua::Error::RuntimeError(format!("Could not create the struct definition: {}", e)))?;
+
+  Ok(NativeStruct {
+    fields: definition.fields.clone(),
+    address,
+  })
 }
