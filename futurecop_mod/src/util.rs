@@ -685,8 +685,14 @@ pub fn suspend_all_other_threads() -> Result<(), anyhow::Error> {
         let threads = get_other_threads()?;
 
         for thread in threads {
-            let thread_handle = OpenThread(THREAD_ALL_ACCESS, false, thread.th32ThreadID)
-                .map_err(|e| anyhow!("Could not get handle to thread {}: {}", thread.th32ThreadID, e))?;
+            let thread_handle = match OpenThread(THREAD_ALL_ACCESS, false, thread.th32ThreadID) {
+                Ok(h)  => h,
+                Err(e) => {
+                    // Don't panic or stop, not every thread is important
+                    warn!("Could not get handle to thread {}, {}", thread.th32ThreadID, e);
+                    continue
+                }
+            };
 
             info!("Got thread {}, suspending", thread.th32ThreadID);
 
@@ -711,8 +717,14 @@ pub fn resume_all_threads() -> Result<(), anyhow::Error> {
 
     unsafe {
         for thread in threads {
-            let thread_handle = OpenThread(THREAD_ALL_ACCESS, false, thread.th32ThreadID)
-                .map_err(|e| anyhow!("Could not get handle to thread {}: {}", thread.th32ThreadID, e))?;
+            let thread_handle = match OpenThread(THREAD_ALL_ACCESS, false, thread.th32ThreadID) {
+                Ok(h)  => h,
+                Err(e) => {
+                    // Don't panic or stop, not every thread is important
+                    warn!("Could not get handle to thread {}, {}", thread.th32ThreadID, e);
+                    continue
+                }
+            };
 
             info!("Resume thread {}", thread.th32ThreadID);
             ResumeThread(thread_handle);
