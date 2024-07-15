@@ -2,7 +2,7 @@ use std::{cell::OnceCell, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, tim
 
 use log::*;
 use num;
-use windows::{Win32::System::Diagnostics::Debug::OutputDebugStringA, core::{PCSTR, s}, Win32::UI::Input::KeyboardAndMouse::*};
+use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use crate::{api::graphics::{self, EXAMPLE_ITEM}, config::Config, futurecop::*, input::KeyState, plugins::plugin_manager::GlobalPluginManager, util::resume_all_threads};
 use crate::futurecop::global::*;
 use crate::util::install_hook;
@@ -123,6 +123,7 @@ pub fn mod_loop() {
     }
 }
 
+#[allow(static_mut_refs)]
 fn handle_player_sprint(player_id: u8, player_entity: &mut PlayerEntity) {
     let player_sprint_key;
     let player: &mut Player;
