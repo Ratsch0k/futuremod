@@ -1,5 +1,5 @@
 use std::{collections::HashMap, ffi::c_void, mem::{self, size_of}, sync::{Arc, Mutex}};
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use windows::Win32::{Foundation::CloseHandle, System::{Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Thread32First, Thread32Next, TH32CS_SNAPTHREAD, THREADENTRY32}, Memory::*, Threading::{GetCurrentProcessId, GetCurrentThreadId, OpenThread, ResumeThread, SuspendThread, THREAD_ALL_ACCESS}}};
 use iced_x86::{Code, Decoder, DecoderOptions};
 use anyhow::{anyhow, bail};
@@ -21,8 +21,6 @@ pub unsafe fn install_hook<Fn>(target_fn_address: usize, hook_fn: Fn) -> Option<
         if instruction.is_invalid() {
             return None;
         }
-
-
 
         if prelude_size >= required_bytes {
             break

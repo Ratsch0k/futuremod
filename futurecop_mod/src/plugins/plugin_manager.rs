@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 use crate::plugins::plugin_info::load_plugin_info;
 use regex::Regex;
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 
 use super::plugin::*;
 use super::plugin_info::PluginInfoError;
@@ -95,7 +95,7 @@ pub enum PluginInstallError {
 /// and thus has now the state [`PluginState::Error`], it will have the state [`StoredPluginState::Disabled`].
 /// Rather, this states whether the plugin manager will load and/or enable the plugin when it starts the next time.
 /// This state is only updated due to the user's input.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 enum PersistentPluginState {
     Unloaded,
     Disabled,
@@ -130,20 +130,41 @@ impl PersistentPluginStates {
         self.write_to_file()
     }
 
+    pub fn update(&mut self, name: &str, state: PersistentPluginState) -> Result<(), anyhow::Error> {
+        let plugin_state = match self.states.get_mut(name) {
+            Some(p) => p,
+            None => bail!("Plugin doesn't exist"),
+        };
+
+        *plugin_state = state;
+
+        self.write_to_file()
+    }
+
     pub fn write_to_file(&self) -> Result<(), anyhow::Error> {
         let content = serde_json::to_string(&self.states).map_err(|e| anyhow!("could not serialize plugin states to string: {}", e.to_string()))?;
 
         fs::write(&self.path, content).map_err(|e| anyhow!("could not persist change: {}", e.to_string()))
     }
 
-    pub fn remove(&mut self, name: &str) {
+    pub fn remove(&mut self, name: &str) -> Result<(), anyhow::Error> {
         self.states.remove(name);
+
+        self.write_to_file()
     }
 }
 
 fn persist_plugin_state_change(states: &mut PersistentPluginStates, plugin: &Plugin, state: PersistentPluginState) {
-    if let Err(e) = states.insert(&plugin.info.name, PersistentPluginState::Enabled) {
+    debug!("Changing persistence state of plugin {} to {:?}", plugin.info.name, state);
+    if let Err(e) = states.insert(&plugin.info.name, state) {
         warn!("Could not persist change '{}' -> {:?}: {:?}", plugin.info.name, state, e);
+    }
+}
+
+fn remove_plugin_from_persistence(states: &mut PersistentPluginStates, plugin_name: &str) {
+    debug!("Removing plugin {} from persistence", plugin_name);
+    if let Err(e) = states.remove(&plugin_name) {
+        warn!("Could not write plugin persistence to file: {}", e);
     }
 }
 
@@ -345,7 +366,7 @@ impl PluginManager {
       match self.plugins.get_mut(name) {
           Some(game_plugin) => {
               game_plugin.disable().map_err(PluginManagerError::Plugin)?;
-                persist_plugin_state_change(&mut self.persistent_states, game_plugin, PersistentPluginState::Disabled);
+              persist_plugin_state_change(&mut self.persistent_states, game_plugin, PersistentPluginState::Disabled);
 
               Ok(())
           },
@@ -470,12 +491,13 @@ impl PluginManager {
   pub fn uninstall_plugin(&mut self, name: &str) -> Result<(), PluginManagerError> {
     info!("Uninstalling plugin: {}", name);
 
-    self.persistent_states.remove(name);
-
     let plugin = match self.plugins.get_mut(name) {
         None => return Err(PluginManagerError::PluginNotFound),
         Some(p) => p,
     };
+
+    // Persist change
+    remove_plugin_from_persistence(&mut self.persistent_states, &plugin.info.name);
 
     // We will execute the plugin's disable function just that it has a chance to be uninstalled cleanly.
     // However, we won't care if the plugin's disable function will throw an error and still remove it afterwards.
