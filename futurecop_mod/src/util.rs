@@ -625,7 +625,7 @@ impl Hook {
 
 /// Get all current threads of FutureCop except the caller.
 pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
-    info!("Get other threads of process");
+    debug!("Get other threads of process");
     
     unsafe {
         // Get thread and process id of current thread
@@ -633,7 +633,7 @@ pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
         let own_thread_id = GetCurrentThreadId();
         let own_process_id = GetCurrentProcessId();
 
-        info!("Get thread snapshot");
+        debug!("Get thread snapshot");
 
         // Get snapshot of threads. Used to iterate through all threads
         let thread_snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
@@ -647,7 +647,7 @@ pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
         let mut thread_entry: THREADENTRY32 = Default::default();
         thread_entry.dwSize = size_of::<THREADENTRY32>() as u32;
 
-        info!("Get first thread");
+        debug!("Get first thread");
 
         if let Err(e) = Thread32First(thread_snap, &mut thread_entry) {
             close_thread_snap_handle()?;
@@ -656,12 +656,12 @@ pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
 
         let mut threads: Vec<THREADENTRY32> = Vec::new();
 
-        info!("Iterate through threads");
+        debug!("Iterate through threads");
         // Iterate through all threads and collect them
         loop {
-            info!("Checking thread PID={}, TID={}", thread_entry.th32OwnerProcessID, thread_entry.th32ThreadID);
+            debug!("Checking thread PID={}, TID={}", thread_entry.th32OwnerProcessID, thread_entry.th32ThreadID);
             if thread_entry.th32OwnerProcessID == own_process_id && thread_entry.th32ThreadID != own_thread_id {
-                info!("Found thread {}", thread_entry.th32ThreadID);
+                debug!("Found thread {}", thread_entry.th32ThreadID);
 
                 threads.push(thread_entry.clone());
             }
@@ -680,7 +680,7 @@ pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
 
 /// Suspend all currently running threads of FutureCop except the thread of the caller.
 pub fn suspend_all_other_threads() -> Result<(), anyhow::Error> {
-    info!("Suspend all other threads");
+    debug!("Suspend all other threads");
     unsafe {
         let threads = get_other_threads()?;
 
@@ -694,7 +694,7 @@ pub fn suspend_all_other_threads() -> Result<(), anyhow::Error> {
                 }
             };
 
-            info!("Got thread {}, suspending", thread.th32ThreadID);
+            debug!("Got thread {}, suspending", thread.th32ThreadID);
 
             // Suspend the thread
             SuspendThread(thread_handle);
@@ -705,14 +705,14 @@ pub fn suspend_all_other_threads() -> Result<(), anyhow::Error> {
         }
     }
 
-    info!("Suspended all threads");
+    debug!("Suspended all threads");
 
     Ok(())
 }
 
 /// Resume all threads of FutureCop.
 pub fn resume_all_threads() -> Result<(), anyhow::Error> {
-    info!("Resume all threads");
+    debug!("Resume all threads");
     let threads = get_other_threads()?;
 
     unsafe {
@@ -726,7 +726,7 @@ pub fn resume_all_threads() -> Result<(), anyhow::Error> {
                 }
             };
 
-            info!("Resume thread {}", thread.th32ThreadID);
+            debug!("Resume thread {}", thread.th32ThreadID);
             ResumeThread(thread_handle);
 
             // If we can't close the handle, don't stop, just print a warning
