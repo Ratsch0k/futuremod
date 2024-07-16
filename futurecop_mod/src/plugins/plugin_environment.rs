@@ -119,6 +119,38 @@ fn prepare_libraries(lua: Arc<Lua>, info: &PluginInfo) -> Result<HashMap<&'stati
   Ok(libraries)
 }
 
+fn link_global_by_name(name: &str, src: &mlua::Table, dst: &mlua::Table) -> Result<(), mlua::Error> {
+  dst.set(name, src.get::<_, mlua::Value>(name)?)
+}
+
+const DEFAULT_GLOBALS: [&str; 17] = [
+  "assert",
+  "error",
+  "getmetatable",
+  "ipairs",
+  "next",
+  "pairs",
+  "pcall",
+  "rawequal",
+  "rawget",
+  "rawlen",
+  "rawset",
+  "setmetatable",
+  "select",
+  "tonumber",
+  "tostring",
+  "type",
+  "xpcall"
+];
+
+fn add_default_globals(table: &mlua::Table, globals: &mlua::Table) -> Result<(), mlua::Error> {
+  for global in DEFAULT_GLOBALS {
+    link_global_by_name(global, globals, table)?;
+  }
+
+  Ok(())
+}
+
 impl PluginEnvironment {
   /// Create a new plugin environment for a plugin with the given information.
   pub fn new(lua: Arc<Lua>, plugin_info: &PluginInfo) -> Result<Self, mlua::Error> {
@@ -206,6 +238,8 @@ impl PluginEnvironment {
     
     table.set("print", print_fn)?;
     table.set("require", require_fn)?;
+
+    add_default_globals(&table, &lua.globals())?;
 
     Ok(PluginEnvironment { table: table.into_owned(), package_cache })
   }
