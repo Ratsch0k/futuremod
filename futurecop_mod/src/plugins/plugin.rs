@@ -239,10 +239,18 @@ impl Plugin {
     /// Reload the plugin.
     /// 
     /// Simply unloads the plugin and loads it again.
+    /// If the plugin was enabled, it enables it again.
     pub fn reload(&mut self) -> Result<(), PluginError> {
+        let was_enabled = self.enabled;
+
         self.unload()?;
 
-        self.load()
+        self.load()?;
+
+        match was_enabled {
+            true => self.enable(),
+            false => Ok(()),
+        }
     }
 
     /// Disable the plugin.
