@@ -21,6 +21,7 @@ pub fn align_icon<'a, Message>(content: impl Into<Element<'a, Message, theme::Th
   container(content).padding([2.0, 0.0, 0.0, 0.0])
 }
 
+#[allow(unused)]
 pub fn icon_with_color<'a, Message>(content: BootstrapIcon, color: Color) -> Container<'a, Message, theme::Theme> {
   align_icon(icon_text(content).style(theme::Text::Color(color)))
 }

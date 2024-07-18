@@ -48,6 +48,7 @@ pub fn deviate(color: Color, amount: f32) -> Color {
     }
 }
 
+#[allow(unused)]
 pub fn mix(a: Color, b: Color, factor: f32) -> Color {
     let a_lin = Rgb::from(a).into_linear();
     let b_lin = Rgb::from(b).into_linear();
