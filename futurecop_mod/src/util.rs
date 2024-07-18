@@ -631,8 +631,6 @@ pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
         let own_thread_id = GetCurrentThreadId();
         let own_process_id = GetCurrentProcessId();
 
-        debug!("Get thread snapshot");
-
         // Get snapshot of threads. Used to iterate through all threads
         let thread_snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
             .map_err(|e| anyhow!("Could not get thread snapshot: {}", e))?;
@@ -645,8 +643,6 @@ pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
         let mut thread_entry: THREADENTRY32 = Default::default();
         thread_entry.dwSize = size_of::<THREADENTRY32>() as u32;
 
-        debug!("Get first thread");
-
         if let Err(e) = Thread32First(thread_snap, &mut thread_entry) {
             close_thread_snap_handle()?;
             bail!("Could not get info about first thread: {}", e);
@@ -654,12 +650,9 @@ pub fn get_other_threads() -> Result<Vec<THREADENTRY32>, anyhow::Error> {
 
         let mut threads: Vec<THREADENTRY32> = Vec::new();
 
-        debug!("Iterate through threads");
         // Iterate through all threads and collect them
         loop {
-            debug!("Checking thread PID={}, TID={}", thread_entry.th32OwnerProcessID, thread_entry.th32ThreadID);
             if thread_entry.th32OwnerProcessID == own_process_id && thread_entry.th32ThreadID != own_thread_id {
-                debug!("Found thread {}", thread_entry.th32ThreadID);
 
                 threads.push(thread_entry.clone());
             }
@@ -692,8 +685,6 @@ pub fn suspend_all_other_threads() -> Result<(), anyhow::Error> {
                 }
             };
 
-            debug!("Got thread {}, suspending", thread.th32ThreadID);
-
             // Suspend the thread
             SuspendThread(thread_handle);
 
@@ -702,8 +693,6 @@ pub fn suspend_all_other_threads() -> Result<(), anyhow::Error> {
             }
         }
     }
-
-    debug!("Suspended all threads");
 
     Ok(())
 }
@@ -724,7 +713,6 @@ pub fn resume_all_threads() -> Result<(), anyhow::Error> {
                 }
             };
 
-            debug!("Resume thread {}", thread.th32ThreadID);
             ResumeThread(thread_handle);
 
             // If we can't close the handle, don't stop, just print a warning
