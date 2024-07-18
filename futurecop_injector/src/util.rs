@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use iced::Color;
 use palette::{Hsl, FromColor, rgb::Rgb, Mix};
 
@@ -62,4 +64,9 @@ pub fn alpha(a: Color, alpha: f32) -> Color {
     a.a = alpha;
 
     a
+}
+
+/// Waits for the given duration of milliseconds.
+pub async fn wait_for_ms(duration: u64) {
+    tokio::time::sleep(Duration::from_millis(duration)).await
 }
