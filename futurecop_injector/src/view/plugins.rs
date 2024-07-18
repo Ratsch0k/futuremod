@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, container, row, rule, scrollable, text, Space, Toggler}, Alignment, Command, Length, Padding};
 use iced_aw::{modal, BootstrapIcon};
-use log::{debug, info, warn};
+use log::{info, warn};
 use rfd::FileDialog;
 use futurecop_data::plugin::*;
 

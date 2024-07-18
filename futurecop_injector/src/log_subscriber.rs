@@ -30,6 +30,7 @@ pub struct LogRecord {
     pub message: String,
     pub level: String,
     pub timestamp: String,
+    pub plugin: Option<String>
 }
 
 pub fn connect(base_address: String) -> Subscription<Event> {

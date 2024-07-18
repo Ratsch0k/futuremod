@@ -5,6 +5,9 @@ pub use button::button;
 mod icon;
 pub use icon::*;
 
+mod font;
+pub use font::*;
+
 pub type Renderer = iced::Renderer;
 pub type Theme = crate::theme::Theme;
 
