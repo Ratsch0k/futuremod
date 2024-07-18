@@ -1,9 +1,9 @@
 #![allow(dead_code)]
-use std::{ffi::c_void, fs, path, time::SystemTime, str::FromStr};
+use std::{ffi::c_void, fs, path, str::FromStr};
 use anyhow::anyhow;
 use config::Config;
-use fern::Output;
 use log::Log;
+use log4rs::{append::file::FileAppender, config::{Appender, Logger, Root}};
 use util::suspend_all_other_threads;
 use windows::{ Win32::Foundation::*, Win32::System::SystemServices::*, Win32::System::Diagnostics::Debug::*, Win32::System::Threading::*, core::{s, PCSTR}};
 mod futurecop;
@@ -114,38 +114,28 @@ unsafe extern "system" fn main(_: *mut c_void) -> u32 {
 
 /// Setup logging.
 /// 
-/// Initializes fern logging with the websocket based logger, simply debug output and file base logging
-fn setup_logging(level: &str) -> Result<(), fern::InitError> {
-    fern::Dispatch::new()
-        .level(log::LevelFilter::from_str(level).unwrap_or(log::LevelFilter::Info))
-        .level_for("hyper", log::LevelFilter::Off)
-        .chain(
-            fern::Dispatch::new()
-                .format(|out, message, record| {
-                    out.finish(
-                        format_args!(
-                            "{} [{}] {} - {} ",
-                            humantime::format_rfc3339_seconds(SystemTime::now()),
-                            record.level(),
-                            record.target(),
-                            message,
-                        )
-                    )
-                })
-                .chain(fern::log_file("fcop_mod.log")?)
-                .chain(windows_logger())
-        )
-        .chain(
-            fern::Dispatch::new()
-            .format(|out, message, _record| {
-                out.finish(format_args!("{}", message))
-            })
-            .chain(Box::new(&*server::LOG_PUBLISHER) as Box<dyn Log>)
-        ).apply()?;
+/// Initialize two different log destination, sets up log level and disables unwanted log targets.
+fn setup_logging(level: &str) -> Result<(), anyhow::Error> {
+    let level = log::LevelFilter::from_str(level).map_err(|_| anyhow!("Invalid log level"))?;
+
+    let file_appender = FileAppender::builder()
+        .build("fcop_mod.log")
+        .map_err(|e| anyhow!("Could not build file appender: {}", e))?;
+
+    let config = log4rs::Config::builder()
+        .appender(Appender::builder().build("websocket", Box::new(&*server::LOG_PUBLISHER)))
+        .appender(Appender::builder().build("debug", Box::new(WindowsLogger)))
+        .appender(Appender::builder().build("file", Box::new(file_appender)))
+        .logger(Logger::builder().build("hyper", log::LevelFilter::Off))
+        .build(Root::builder().appender("debug").appender("websocket").appender("file").build(level))
+        .map_err(|e| anyhow!("Could not build logger: {}", e))?;
+
+    log4rs::init_config(config).map_err(|e| anyhow!("Could not initialize logger config: {}", e))?;
 
     Ok(())
 }
 
+#[derive(Debug)]
 struct WindowsLogger;
 impl Log for WindowsLogger {
     fn enabled(&self, _metadata: &log::Metadata) -> bool {
@@ -161,8 +151,4 @@ impl Log for WindowsLogger {
     fn flush(&self) {
         
     }
-}
-
-fn windows_logger() -> Output {
-    Output::from(Box::new(WindowsLogger{}) as Box<dyn Log>)
 }
