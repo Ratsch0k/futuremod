@@ -6,7 +6,7 @@ use log::{info, warn};
 use rfd::FileDialog;
 use futurecop_data::plugin::*;
 
-use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, widget::{button, icon, icon_with_style, Column, Element, Row}};
+use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, util::wait_for_ms, widget::{button, icon, icon_with_style, Column, Element, Row}};
 use crate::theme::Button;
 
 #[derive(Debug, Clone)]
@@ -15,6 +15,7 @@ pub struct PluginsView {
   selected_plugin: Option<String>,
   error: Option<String>,
   confirm_installation: Option<InstallConfirmationPrompt>,
+  show_reload_success_message: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -49,7 +50,8 @@ pub enum Message {
   InstallResponse(Result<(), String>),
   ClearError,
   UninstallPlugin(String),
-  UninstallPluginResponse(Result<String, String>)
+  UninstallPluginResponse(Result<String, String>),
+  HideReloadSuccessfulMessage,
 }
 
 
@@ -66,7 +68,13 @@ impl Plugins {
         Plugins::Loading => match message {
           Message::GetPluginsResult(result) => match result {
               Ok(result) => {
-                *self = Plugins::Loaded(PluginsView{plugins: result, selected_plugin: None, error: None, confirm_installation: None});
+                *self = Plugins::Loaded(PluginsView{
+                  plugins: result,
+                  selected_plugin: None, 
+                  error: None, 
+                  confirm_installation: None, 
+                  show_reload_success_message: false
+                });
                 Command::none()
               },
               Err(e) => {
@@ -131,15 +139,26 @@ impl Plugins {
             match response {
               Ok(new_plugins) => {
                 plugins_view.plugins = new_plugins;
-                Command::none()
+                plugins_view.show_reload_success_message = true;
+
+                Command::perform(
+                  wait_for_ms(3000), 
+                  |_| Message::HideReloadSuccessfulMessage,
+                )
               },
               Err(e) => {
                 *self = Plugins::Error(e);
+
 
                 Command::none()
               }
             }
           },
+          Message::HideReloadSuccessfulMessage => {
+            plugins_view.show_reload_success_message = false;
+
+            Command::none()
+          }
           Message::SelectPluginToInstall => {
             let plugin_package = match FileDialog::new()
               .set_title("Select the Plugin Package to install")
@@ -249,7 +268,7 @@ impl Plugins {
             if let Some(plugin_name) = &plugin_view.selected_plugin {
               let plugin = plugin_view.plugins.get(plugin_name).unwrap();
 
-              return plugin_details_view(plugin);
+              return plugin_details_view(plugin, plugin_view.show_reload_success_message);
             }
 
             let mut list = Column::new();
@@ -468,7 +487,12 @@ fn plugin_uninstall_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
   .into()
 }
 
-fn plugin_details_view<'a>(plugin: &Plugin) -> Element<'a, Message> {
+fn plugin_details_view<'a>(plugin: &Plugin, show_reload_success_msg: bool) -> Element<'a, Message> {
+  let reload_success_msg = match show_reload_success_msg {
+    true => Some(text("Successfully reloaded")),
+    false => None, 
+  };
+
   column![
     row![
       button(icon(BootstrapIcon::ArrowLeft)).style(Button::Text).on_press(Message::GoToOverview),
@@ -482,6 +506,7 @@ fn plugin_details_view<'a>(plugin: &Plugin) -> Element<'a, Message> {
       .push(plugin_reload_button(plugin))
       .push_maybe(plugin_toggle_button(plugin))
       .push(plugin_uninstall_button(plugin))
+      .push_maybe(reload_success_msg)
       .spacing(8)
       .padding([0, 0, 8, 0])
       .align_items(Alignment::Center),
