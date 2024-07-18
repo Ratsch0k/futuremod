@@ -4,6 +4,7 @@ use axum::{
     body::Bytes, extract::{ws::{Message, WebSocket, WebSocketUpgrade}, BodyStream}, http::StatusCode, response::{IntoResponse, Response}, routing::{get, post, put}, BoxError, Json, Router,
 };
 use futurecop_data::plugin::PluginInfo;
+use kv::Key;
 use log::*;
 use serde::{Serialize, Deserialize};
 use tokio::{fs, io, runtime::Runtime, sync::broadcast::{self, Receiver, Sender}};
@@ -463,6 +464,7 @@ async fn uninstall_plugin(Json(payload): Json<PluginByName>) -> impl IntoRespons
     })
 }
 
+#[derive(Debug)]
 pub struct LogPublisher {
     publisher: Sender<(u64, LogRecord)>,
     _base_rx: Receiver<(u64, LogRecord)>,
@@ -474,6 +476,7 @@ pub struct LogRecord {
     target: String,
     level: String,
     timestamp: String,
+    plugin: Option<String>,
 }
 
 impl<'a> From<&log::Record<'a>> for LogRecord {
@@ -483,6 +486,7 @@ impl<'a> From<&log::Record<'a>> for LogRecord {
             target: value.target().to_string(),
             level: value.level().as_str().to_string(),
             timestamp: humantime::format_rfc3339_millis(SystemTime::now()).to_string(),
+            plugin: value.key_values().get(Key::from("plugin")).map(|value| value.to_string()),
         }
     }
 }

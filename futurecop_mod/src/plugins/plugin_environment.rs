@@ -162,7 +162,15 @@ impl PluginEnvironment {
     // Create and set functions
     let print_target = plugin_info.name.to_string();
     let print_fn = lua.create_function(move |_, msg: mlua::Value| {
-      info!(target: format!("plugin::{}", print_target).as_str(), "{:?}", msg);
+      // Convert the message into a string.
+      // If the value cannot be converted to string, use it's debug representation
+      let msg = match msg.to_string() {
+        Ok(msg) => msg,
+        Err(_) => format!("{:?}", msg),
+      };
+      let plugin_name = print_target.clone();
+
+      info!(target: format!("plugin::{}", print_target).as_str(), plugin:% = plugin_name; "{}", msg);
 
       Ok(())
     })?;
