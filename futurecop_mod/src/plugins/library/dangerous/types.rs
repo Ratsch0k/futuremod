@@ -64,8 +64,8 @@ pub unsafe fn lua_to_native<'a>(lua_type: Type, lua_value: &'a mlua::Value) -> R
   let actual_type_name = lua_value.type_name();
 
   let value: Vec<u32> = match lua_type {
-    Type::Integer => match lua_value.as_u32() {
-      Some(value) => vec![value],
+    Type::Integer => match lua_value.as_i32() {
+      Some(value) => vec![value as u32],
       None => bail!("value {} is not an integer", actual_type_name),
     },
     Type::Float => match lua_value.as_f32() {

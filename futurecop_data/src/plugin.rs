@@ -11,6 +11,7 @@ pub enum PluginDependency {
   #[serde(rename = "ui")]
   UI,
   System,
+  Matrix,
 
   // The following libraries are from the standard library
   Math,
@@ -32,7 +33,8 @@ impl Display for PluginDependency {
         PluginDependency::Table => f.write_str("Table"),
         PluginDependency::Bit32 => f.write_str("Bit32"),
         PluginDependency::String => f.write_str("String"),
-        PluginDependency::Utf8 => f.write_str("Utf8")
+        PluginDependency::Utf8 => f.write_str("Utf8"),
+        PluginDependency::Matrix => f.write_str("Matrix"),
       }
     }
 }

@@ -1,7 +1,12 @@
 use log::debug;
-use mlua::Lua;
+use mlua::{AnyUserDataExt, Lua};
 
-use crate::plugins::library::dangerous::{Type, MAX_STRING};
+use crate::plugins::library::{dangerous::{Type, MAX_STRING}, LuaResult};
+
+fn try_userdata_to_bytes(userdata: &mlua::AnyUserData) -> LuaResult<Vec<u8>> {
+  userdata.call_method("toBytes", ())
+    .map_err(|e| mlua::Error::RuntimeError(format!("Could not convert userdata into bytes: {}", e)))
+}
 
 /// Lua function to write arbitrary to a arbitrary memory address.
 /// 
@@ -51,6 +56,10 @@ pub fn write_memory_function<'lua>(_: &'lua Lua, (address, data): (u32, mlua::Va
       debug!("Writing string");
       value.as_bytes().to_vec()
     },
+    mlua::Value::UserData(userdata) => {
+      debug!("Writing userdata");
+      try_userdata_to_bytes(&userdata)?
+    }
     _ => return Err(mlua::Error::RuntimeError("invalid argument. following types are supported: table, number, integer, string".to_string()))
   };
 

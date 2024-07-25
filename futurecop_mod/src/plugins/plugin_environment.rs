@@ -4,7 +4,7 @@ use anyhow::bail;
 use log::*;
 use mlua::{Lua, OwnedTable};
 use futurecop_data::plugin::{PluginInfo, PluginDependency};
-use super::library::{dangerous::create_dangerous_library, game::create_game_library, input::create_input_library, system::create_system_library, ui::create_ui_library};
+use super::library::{dangerous::create_dangerous_library, game::create_game_library, input::create_input_library, matrix::create_matrix_library, system::create_system_library, ui::create_ui_library};
 
 /// Holds the entire plugin environment.
 /// 
@@ -108,6 +108,7 @@ fn prepare_libraries(lua: Arc<Lua>, info: &PluginInfo) -> Result<HashMap<&'stati
       PluginDependency::Input => libraries.insert("input", create_input_library(lua.clone())?),
       PluginDependency::UI => libraries.insert("ui", create_ui_library(lua.clone())?),
       PluginDependency::System => libraries.insert("system", create_system_library(lua.clone())?),
+      PluginDependency::Matrix => libraries.insert("matrix", create_matrix_library(lua.clone())?),
       PluginDependency::Math => libraries.insert("math", globals.get("math").to_owned()?),
       PluginDependency::Bit32 => libraries.insert("bit32", globals.get("bit32").to_owned()?),
       PluginDependency::String => libraries.insert("string", globals.get("string").to_owned()?),
