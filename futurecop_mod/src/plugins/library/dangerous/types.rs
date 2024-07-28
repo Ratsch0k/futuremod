@@ -1,4 +1,5 @@
 use anyhow::bail;
+use log::info;
 use mlua::Lua;
 
 /// Supported types for lua to/from native conversion.
@@ -6,8 +7,11 @@ use mlua::Lua;
 pub enum Type {
   String,
   Integer,
+  UnsignedInteger,
   Byte,
+  UnsignedByte,
   Short,
+  UnsignedShort,
   Float,
   Void,
 }
@@ -17,10 +21,13 @@ impl Type {
     let type_value = match name {
       "string" => Type::String,
       "int" => Type::Integer,
+      "uint" => Type::UnsignedInteger,
       "float" => Type::Float,
       "void" => Type::Void,
       "short" => Type::Short,
+      "ushort" => Type::UnsignedShort,
       "byte" => Type::Byte,
+      "ubyte" => Type::UnsignedByte,
       _ => return None,
     };
 
@@ -33,7 +40,6 @@ pub const MAX_STRING: u16 = 1024;
 /// Convert a native value into its lua value given the type name.
 pub unsafe fn native_to_lua<'a>(lua: &'a Lua, lua_type: Type, raw_value: u32) -> Result<mlua::Value<'a>, mlua::Error> {
   let value = match lua_type {
-    Type::Integer => mlua::Value::Integer(raw_value as i32),
     Type::String => {
       let mut string_bytes: Vec<u8> = Vec::new();
       let string_pointer = raw_value as *const u8;
@@ -52,8 +58,12 @@ pub unsafe fn native_to_lua<'a>(lua: &'a Lua, lua_type: Type, raw_value: u32) ->
     },
     Type::Float => mlua::Value::Number(f64::from(raw_value as f32)),
     Type::Void => mlua::Value::Nil,
+    Type::Integer => mlua::Value::Integer(raw_value as i32),
+    Type::UnsignedInteger => mlua::Value::Integer(raw_value as i32),
     Type::Short => mlua::Value::Integer(Into::<i32>::into(raw_value as i16)),
-    Type::Byte => mlua::Value::Integer(Into::<i32>::into(raw_value as i8))
+    Type::UnsignedShort => mlua::Value::Integer(Into::<i32>::into(raw_value as u16)),
+    Type::Byte => mlua::Value::Integer(Into::<i32>::into(raw_value as i8)),
+    Type::UnsignedByte => mlua::Value::Integer(Into::<i32>::into(raw_value as u8)),
   };
 
   Ok(value)
@@ -64,10 +74,7 @@ pub unsafe fn lua_to_native<'a>(lua_type: Type, lua_value: &'a mlua::Value) -> R
   let actual_type_name = lua_value.type_name();
 
   let value: Vec<u32> = match lua_type {
-    Type::Integer => match lua_value.as_i32() {
-      Some(value) => vec![value as u32],
-      None => bail!("value {} is not an integer", actual_type_name),
-    },
+
     Type::Float => match lua_value.as_f32() {
       Some(value) => vec![value as u32],
       None => bail!("value {} is not a float", actual_type_name),
@@ -79,14 +86,30 @@ pub unsafe fn lua_to_native<'a>(lua_type: Type, lua_value: &'a mlua::Value) -> R
       },
       None => bail!("value {} is not a string", actual_type_name),
     },
-    Type::Byte => match lua_value.as_u32() {
-      Some(value) => vec![value],
-      None => bail!("value {} is not a number", actual_type_name)
+    Type::Integer => match lua_value.as_i32() {
+      Some(value) => vec![value as u32],
+      None => bail!("value {} is not an int", actual_type_name),
     },
-    Type::Short => match lua_value.as_u32() {
-      Some(value) => vec![value],
-      None => bail!("value {} is not a number", actual_type_name),
-    }
+    Type::UnsignedInteger => match lua_value.as_u32() {
+      Some(value) => vec![value as u32],
+      None => bail!("value {} is not an uint", actual_type_name),
+    },
+    Type::Short => match lua_value.as_i32() {
+      Some(value) => vec![value as u32],
+      None => bail!("value {} is not a short", actual_type_name),
+    },
+    Type::UnsignedShort => match lua_value.as_u32() {
+      Some(value) => vec![value as u32],
+      None => bail!("value {} is not a ushort", actual_type_name),
+    },
+    Type::Byte => match lua_value.as_i32() {
+      Some(value) => vec![value as u32],
+      None => bail!("value {} is not a byte", actual_type_name)
+    },
+    Type::UnsignedByte => match lua_value.as_u32() {
+      Some(value) => vec![value as u32],
+      None => bail!("value {} is not a ubyte", actual_type_name)
+    },
   };
 
   Ok(value)

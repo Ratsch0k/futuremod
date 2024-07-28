@@ -383,19 +383,40 @@ impl UserData for NativeStruct {
 
             match primitive {
               Type::Byte => {
+                let field_ptr = field_addr as *mut i8;
+
+                unsafe {
+                  *field_ptr = native_value[0] as i8;
+                }
+              },
+              Type::Short => {
+                let field_ptr = field_addr as *mut i16;
+
+                unsafe {
+                  *field_ptr = native_value[0] as i16;
+                }
+              },
+              Type::UnsignedByte => {
                 let field_ptr = field_addr as *mut u8;
 
                 unsafe {
                   *field_ptr = native_value[0] as u8;
                 }
               },
-              Type::Short => {
+              Type::UnsignedShort => {
                 let field_ptr = field_addr as *mut u16;
 
                 unsafe {
                   *field_ptr = native_value[0] as u16;
                 }
               },
+              Type::Integer => {
+                let field_ptr = field_addr as *mut i32;
+
+                unsafe {
+                  *field_ptr = native_value[0] as i32;
+                }
+              }
               _ => {
                 let field_ptr = field_addr as *mut u32;
 

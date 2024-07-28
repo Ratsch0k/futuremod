@@ -108,10 +108,13 @@ pub fn read_memory_function<'lua>(lua: &'lua Lua, (address, type_name): (u32, St
   
         mlua::Value::String(lua.create_string(string_bytes.as_slice())?)
       },
-      Type::Integer => mlua::Value::Integer(*(address as *const i32)),
       Type::Void => mlua::Value::Nil,
+      Type::Integer => mlua::Value::Integer(*(address as *const i32)),
       Type::Short => mlua::Value::Integer((*(address as *const i16)).into()),
       Type::Byte => mlua::Value::Integer((*(address as *const i8)).into()),
+      Type::UnsignedInteger => mlua::Value::Integer(TryInto::<i32>::try_into(*(address as *const u32)).unwrap()),  // TODO: Properly handle error
+      Type::UnsignedShort => mlua::Value::Integer((*(address as *const u16)).into()),
+      Type::UnsignedByte => mlua::Value::Integer((*(address as *const u8)).into()),
     }
   }
 
