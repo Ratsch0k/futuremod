@@ -1,5 +1,48 @@
 name = "Custom Behavior"
 version = "0.1.0"
 authors = ["Simon Kurz"]
-dependencies = ["dangerous", "bit32", "math"]
-description = "Implementing a custom behavior in a plugin"
+dependencies = ["dangerous", "bit32", "math", "matrix"]
+description = """Implements the behavior of the custom actor called "Healing Station".
+
+I think it is unfair that the Sky Caption can heal himself in his base.
+Thus, I created the actor "Healing Station" that is meant to be placed in the player's base and allows the player to heal themselves.
+
+A healing station is similar to the station's used to spawn tanks or helicopter.
+However, if the player interacts with it, it heals the player.
+In contrast to shield pickups, only one player can interact with the healing station.
+While healing stations have a cool down, it is much shorter than the shield pickup's cool down.
+
+The healing station resembles the other stations.
+However, it uses a different texture and the shield pickup models appears on it if it's interactible.
+
+The healing station uses behavior `0x6f`, two resource references, and requires a 44 byte long actor data block.
+The following bytes show an example of how a healing station could look like in memory:
+
+Offset(h) 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+
+00000000  43 4F 48 53 3C 00 00 00 00 00 00 00 00 00 00 00  COHS<...........
+00000010  52 44 48 53 02 00 00 00 74 63 61 43 68 00 00 00  RDHS....tcaCh...
+00000020  58 00 00 00 0F 07 00 00 0B 07 00 00 0F 07 00 00  X...............
+00000030  01 00 00 00 01 00 00 00 00 00 43 4F 43 4F 48 53  ..........COCOHS
+00000040  6C 00 00 00 00 00 00 00 00 00 00 00 54 41 44 53  l...........TADS
+00000050  54 43 41 74 34 00 00 00 68 00 00 00 6F 00 00 00  TCAt4...h...o...
+00000060  00 13 09 00 00 00 00 00 00 A0 0C 00 C1 00 80 00  ......... ..Á.€.
+00000070  00 00 00 00 00 00 00 00 00 00 00 00 A6 FF 0C 00  ............¦ÿ..
+00000080  D0 07 00 00 4C 53 52 61 24 00 00 00 68 00 00 00  Ð...LSRa$...h...
+00000090  6A 62 6F 43 28 00 00 00 6A 62 6F 43 1A 00 00 00  jboC(...jboC....
+000000A0  4C 4C 55 4E 00 00 00 00                          LLUN....
+
+You can use this example as a template to add your own healing station to any mission.
+However, make sure to change the following value.
+
+Change the actor ID at 0x1c, 0x58, and 0x8c to an ID unsused by any other actor.
+Unfortunately, you must go through the entire mission file and ensure that the ID is unused.
+However, if you use a very high ID like 0x01000001 or similar, it should work.
+
+Change the actor's position. The position on the x-axis is stored at 0x60, y-axis at 0x64, and z-axis at 0x68`.
+
+The next few value are specifiy for the healing station.
+- Rotation: The word at 0x7c specifies the actor's rotation and degree. In the example, it's set to -90 degree.
+- Player: The word at 0x7e specifies which player can interact with the station. Value 0x000c is player 1 and 0x0010 is player 2.
+
+"""
