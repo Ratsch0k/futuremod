@@ -19,7 +19,7 @@ You can install Rust be following their [official guide](https://www.rust-lang.o
 Install FutureMod by running the following commands:
 ```bash
 # Clone the repository
-git clone https://github.com/Ratsch0k/futurecop
+git clone https://github.com/Ratsch0k/futuremod
 
 # Build FutureMod
 cargo build --release
