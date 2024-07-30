@@ -255,7 +255,6 @@ function healingStationRender(event, entityAddr: number, arg3, arg4)
 
     renderObject:call(hoverItemModelPtr, valuePtr, 1)
   end
-  print(`[RENDER] End`)
 
   return 0
 end
