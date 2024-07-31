@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, container, row, rule, scrollable, text, Space, Toggler}, Alignment, Command, Length, Padding};
+use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, container, row, rule, scrollable, text, Scrollable, Space, Toggler}, Alignment, Command, Length, Padding};
 use iced_aw::{modal, BootstrapIcon};
 use log::{info, warn};
 use rfd::FileDialog;
@@ -494,27 +494,30 @@ fn plugin_details_view<'a>(plugin: &Plugin, show_reload_success_msg: bool) -> El
   };
 
   column![
-    row![
-      button(icon(BootstrapIcon::ArrowLeft)).style(Button::Text).on_press(Message::GoToOverview),
-      text(plugin.info.name.clone()).size(24),
-    ].spacing(16).padding([0, 0, 8, 0]).align_items(Alignment::Center),
-    row![
-      text(plugin.info.version.clone()),
-      text(format!("by {}", plugin.info.authors.join(", "))),
-    ].spacing(8).padding([0, 0, 16, 0]),
-    Row::new()
-      .push(plugin_reload_button(plugin))
-      .push_maybe(plugin_toggle_button(plugin))
-      .push(plugin_uninstall_button(plugin))
-      .push_maybe(reload_success_msg)
-      .spacing(8)
-      .padding([0, 0, 8, 0])
-      .align_items(Alignment::Center),
-    plugin_details_state(plugin),
-    container(rule::Rule::horizontal(1.0)).padding([8.0, 0.0, 8.0, 0.0]),
+    container(
+      column![
+        row![
+          button(icon(BootstrapIcon::ArrowLeft)).style(Button::Text).on_press(Message::GoToOverview),
+          text(plugin.info.name.clone()).size(24),
+        ].spacing(16).padding([0, 0, 8, 0]).align_items(Alignment::Center),
+        row![
+          text(plugin.info.version.clone()),
+          text(format!("by {}", plugin.info.authors.join(", "))),
+        ].spacing(8).padding([0, 0, 16, 0]),
+        Row::new()
+          .push(plugin_reload_button(plugin))
+          .push_maybe(plugin_toggle_button(plugin))
+          .push(plugin_uninstall_button(plugin))
+          .push_maybe(reload_success_msg)
+          .spacing(8)
+          .padding([0, 0, 8, 0])
+          .align_items(Alignment::Center),
+        plugin_details_state(plugin),
+      ]
+    ).padding(8),
+    container(rule::Rule::horizontal(1.0)).padding([0, 8, 0, 8]),
     plugin_details_content(plugin),
   ]
-  .padding(8)
   .into()
 }
 
@@ -527,6 +530,7 @@ fn plugin_description<'a>(description: String) -> Element<'a, Message> {
 
   Column::from_vec(Vec::from_iter(lines))
     .spacing(6.0)
+    .width(Length::Fill)
     .into()
 }
 
@@ -537,17 +541,21 @@ fn plugin_details_content<'a>(plugin: &Plugin) -> Element<'a, Message> {
     String::from("No description")
   };
 
-  column![
+  Scrollable::new(
     column![
-      text("Description").size(24),
-      plugin_description(description),
-    ].spacing(8.0),
+      column![
+        text("Description").size(24),
+        plugin_description(description),
+      ].spacing(8.0),
 
-    column![
-      text("Dependencies").size(24),
-      dependencies_list(&plugin.info.dependencies),
+      column![
+        text("Dependencies").size(24),
+        dependencies_list(&plugin.info.dependencies),
+      ]
     ]
-  ].spacing(24)
+    .spacing(24)
+    .padding([8, 8, 8, 8])
+  )
   .into()
 }
 
