@@ -9,6 +9,7 @@ jobs:
   debug_release:
     name: Release a Debug Build
     runs-on: windows-latest
+    permissions: write-all
     steps:
       - uses: actions/checkout@v4
       - name: Install necessary Windows target
@@ -27,6 +28,7 @@ jobs:
   release:
     name: Release
     runs-on: windows-latest
+    permissions: write-all
     steps:
       - uses: actions/checkout@v4
       - name: Install necessary Windows target
