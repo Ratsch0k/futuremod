@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  releases:
+    types: [published]
+
+
+jobs:
+  debug_release:
+    name: Release a Debug Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@4
+      - name: Build
+        run: cargo build
+      - name: |
+          cd ./target/i686-pc-windows-msvc/debug
+          zip futuremod-debug.zip futurecop_mod.dll futurecop_mod.pdb futuremod.exe
+      - name: Upload debug build
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./futuremod-debug.zip
+  release:
+      - uses: actions/checkout@4
+      - name: Build
+        run: cargo build --release
+      - name: |
+          cd ./target/i686-pc-windows-msvc/release
+          zip futuremod.zip futurecop_mod.dll futurecop_mod.pdb futuremod.exe
+      - name: Upload debug build
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./futuremod.zip
