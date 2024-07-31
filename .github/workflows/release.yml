@@ -8,7 +8,7 @@ on:
 jobs:
   debug_release:
     name: Release a Debug Build
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install necessary Windows target
@@ -23,7 +23,7 @@ jobs:
         run: gh release upload ${{ github.ref }} futuremod-debug.zip
   release:
     name: Release
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install necessary Windows target
