@@ -16,9 +16,10 @@ jobs:
       - name: Build
         run: cargo build
       - name: Package files
-        run: |
-          cd ./target/i686-pc-windows-msvc/debug
-          zip futuremod-debug.zip futurecop_mod.dll futurecop_mod.pdb futuremod.exe
+        uses: vimtor/action-zip@v1.2
+          with:
+            files: target/i686-pc-windows-msvc/debug/futurecop_mod.dll target/i686-pc-windows-msvc/debug/futurecop_mod.pdb target/i686-pc-windows-msvc/debug/futuremod.exe
+            dest: futuremod-debug.zip
       - name: Upload packaged debug release
         run: gh release upload ${{ github.ref }} futuremod-debug.zip
   release:
@@ -31,8 +32,9 @@ jobs:
       - name: Build
         run: cargo build --release
       - name: Package files
-        run: |
-          cd ./target/i686-pc-windows-msvc/release
-          zip futuremod.zip futurecop_mod.dll futurecop_mod.pdb futuremod.exe
-      - name: Upload debug build
+        uses: vimtor/action-zip@v1.2
+          with:
+            files: target/i686-pc-windows-msvc/release/futurecop_mod.dll target/i686-pc-windows-msvc/release/futuremod.exe
+            dest: futuremod.zip
+      - name: Upload release build
         run: gh release upload ${{ github.ref }} futuremod.zip
