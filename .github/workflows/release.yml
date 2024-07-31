@@ -21,6 +21,8 @@ jobs:
           files: target/i686-pc-windows-msvc/debug/futurecop_mod.dll target/i686-pc-windows-msvc/debug/futurecop_mod.pdb target/i686-pc-windows-msvc/debug/futuremod.exe
           dest: futuremod-debug.zip
       - name: Upload packaged debug release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: gh release upload ${{ github.ref }} futuremod-debug.zip
   release:
     name: Release
@@ -37,4 +39,6 @@ jobs:
           files: target/i686-pc-windows-msvc/release/futurecop_mod.dll target/i686-pc-windows-msvc/release/futuremod.exe
           dest: futuremod.zip
       - name: Upload release build
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: gh release upload ${{ github.ref }} futuremod.zip
