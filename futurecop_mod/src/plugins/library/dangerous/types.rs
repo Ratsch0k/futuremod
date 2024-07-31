@@ -1,5 +1,4 @@
 use anyhow::bail;
-use log::info;
 use mlua::Lua;
 
 /// Supported types for lua to/from native conversion.
