@@ -10,7 +10,7 @@ jobs:
     name: Release a Debug Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@4
+      - uses: actions/checkout@v4
       - name: Build
         run: cargo build
       - name: Package files
@@ -23,7 +23,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@4
+      - uses: actions/checkout@v4
       - name: Build
         run: cargo build --release
       - name: Package files
