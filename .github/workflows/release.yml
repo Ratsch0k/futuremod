@@ -23,7 +23,7 @@ jobs:
       - name: Upload packaged debug release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.ref }} futuremod-debug.zip
+        run: gh release upload ${{ github.ref_name }} futuremod-debug.zip
   release:
     name: Release
     runs-on: windows-latest
@@ -41,4 +41,4 @@ jobs:
       - name: Upload release build
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.ref }} futuremod.zip
+        run: gh release upload ${{ github.ref_name }} futuremod.zip
