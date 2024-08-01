@@ -5,6 +5,7 @@ use mlua::{AnyUserData, AnyUserDataExt, Lua, MetaMethod, UserData};
 use windows::Win32::System::Memory::{VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE};
 
 use crate::plugins::library::{dangerous::{lua_to_native, lua_to_native_implied, native_to_lua}, LuaResult};
+use crate::util::memory_copy;
 
 use super::Type;
 
@@ -189,7 +190,7 @@ pub fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_
     // mov eax, {arg_len}
     let store_args_in_eax_addr = closure_wrapper as *mut u8;
     *store_args_in_eax_addr = 0xb8;
-    std::ptr::copy_nonoverlapping(&arg_len_in_bytes, store_args_in_eax_addr.add(1) as *mut u32, 1);
+    memory_copy(&arg_len_in_bytes as *const u32 as u32, store_args_in_eax_addr.add(1) as u32, 4);
     offset += 5;
 
     // Insert static instructions
@@ -221,7 +222,7 @@ pub fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_
     // push data
     let push_data_addr = closure_wrapper.add(offset) as *mut u8;
     *push_data_addr = 0x68u8;
-    std::ptr::copy_nonoverlapping(&data, push_data_addr.add(1) as *mut u32, 1);
+    memory_copy(&data as *const u32 as u32, push_data_addr.add(1) as u32, 4);
     offset += 5;
 
     // call native_closure
@@ -230,14 +231,14 @@ pub fn create_native_function_function<'lua>(lua: &'lua Lua, (arg_types, return_
     let jmp_delta = jmp_dst as i32 - jmp_src as i32;
     let call_closure_addr = closure_wrapper.add(offset) as *mut u8;
     *call_closure_addr = 0xe8u8;
-    std::ptr::copy_nonoverlapping(&jmp_delta, call_closure_addr.add(1) as *mut i32, 1);
+    memory_copy(&jmp_delta as *const i32 as u32, call_closure_addr.add(1) as u32, 4);
     offset += 5;
 
     // mov ecx, {arg_len+0x4}
     let mov_arg_len_in_ecx_addr = closure_wrapper.add(offset) as *mut u8;
     *mov_arg_len_in_ecx_addr = 0xb9u8;
     let args_with_data_len = arg_len_in_bytes + 4;
-    std::ptr::copy_nonoverlapping(&args_with_data_len, mov_arg_len_in_ecx_addr.add(1) as *mut u32, 1);
+    memory_copy(&args_with_data_len as *const u32 as u32, mov_arg_len_in_ecx_addr.add(1) as u32, 4);
     offset += 5;
 
     // End
