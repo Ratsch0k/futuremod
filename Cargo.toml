@@ -3,8 +3,9 @@ members = [
   "futurecop_mod",
   "futurecop_injector",
   "futurecop_data",
+  "futurecop_hook",
 ]
 resolver = "2"
 
-[profile.release.package.futurecop-mod]
+[profile.release.package.futurecop_hook]
 opt-level = 0  # Completely disable optimizations for dll due to issues with raw memory modification

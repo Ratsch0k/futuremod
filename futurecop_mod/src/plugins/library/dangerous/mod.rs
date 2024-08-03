@@ -1,15 +1,13 @@
 use std::sync::Arc;
 
 use mlua::Lua;
-use native::{create_native_function_function, create_native_struct_definition_fn, create_native_struct_fn, get_native_function};
+use native::{create_native_struct_definition_fn, create_native_struct_fn};
+use futurecop_hook::lua::{get_native_function, create_native_function_function};
 
-mod types;
-mod hook;
 mod memory;
 mod native;
 
-use types::*;
-use hook::hook_function;
+use futurecop_hook::lua::hook_function;
 use memory::*;
 
 

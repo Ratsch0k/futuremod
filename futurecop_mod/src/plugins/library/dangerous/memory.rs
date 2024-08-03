@@ -1,7 +1,8 @@
+use futurecop_hook::types::{Type, MAX_STRING};
 use log::debug;
 use mlua::{AnyUserDataExt, Lua};
 
-use crate::plugins::library::{dangerous::{Type, MAX_STRING}, LuaResult};
+use crate::plugins::library::LuaResult;
 
 fn try_userdata_to_bytes(userdata: &mlua::AnyUserData) -> LuaResult<Vec<u8>> {
   userdata.call_method("toBytes", ())
