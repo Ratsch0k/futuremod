@@ -402,36 +402,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "futurecop-mod"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "axum-extra",
- "chrono",
- "fern",
- "futures",
- "headers",
- "humantime",
- "iced-x86",
- "json",
- "lazy_static",
- "log",
- "mlua",
- "num",
- "rand",
- "regex",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
- "toml",
- "walkdir",
- "windows",
- "zip",
-]
-
-[[package]]
 name = "futures"
 version = "0.3.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"

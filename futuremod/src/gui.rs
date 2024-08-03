@@ -40,7 +40,7 @@ impl Application for ModInjector {
     }
 
     fn title(&self) -> String {
-        String::from("FutureCop Mod")
+        String::from("FutureMod")
     }
 
     fn theme(&self) -> Self::Theme {
