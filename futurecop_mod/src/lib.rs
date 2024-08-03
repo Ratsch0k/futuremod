@@ -67,7 +67,7 @@ fn read_config() -> Result<Config, anyhow::Error> {
     let config_path = path::Path::new("config.json");
 
     if !config_path.exists() {
-        return Err(anyhow!("cannot find config"));
+        return Ok(Config::default());
     }
 
     let config_content_opt = fs::read_to_string(config_path);

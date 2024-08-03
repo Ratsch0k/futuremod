@@ -1,20 +1,20 @@
 use serde::{Serialize, Deserialize};
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerConfig {
     pub port: u32,
     pub host: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SprintConfig {
     pub player_one: u32,
     pub player_two: u32,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[serde(default = "default_server")]
@@ -45,4 +45,15 @@ fn default_server() -> ServerConfig {
 
 fn default_log_level() -> String {
     "INFO".to_string()
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            server: default_server(),
+            log_level: default_log_level(),
+            plugins_directory: None,
+            sprint_config: None,
+        }
+    }
 }
