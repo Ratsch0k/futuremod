@@ -1,6 +1,6 @@
 use std::{cell::Ref, collections::HashMap};
 
-use log::{debug, info};
+use log::debug;
 use mlua::{AnyUserData, AnyUserDataExt, Lua, MetaMethod, UserData};
 
 use futurecop_hook::types::{lua_to_native, native_to_lua, Type};
@@ -239,7 +239,7 @@ impl UserData for NativeStructDefinition {
 }
 
 pub fn create_native_struct_definition_fn<'lua>(lua: &'lua Lua, fields: mlua::Table<'lua>) -> Result<AnyUserData<'lua>, mlua::Error> {
-  info!("Creating native struct def");
+  debug!("Creating native struct def");
   let mut native_fields: HashMap<String, FieldDefinition> = HashMap::new();
   
   for pair in fields.clone().pairs::<String, mlua::Table>() {
@@ -280,10 +280,10 @@ pub fn create_native_struct_definition_fn<'lua>(lua: &'lua Lua, fields: mlua::Ta
     });
   }
 
-  info!("Created the native struct as userdata");
+  debug!("Created the native struct as userdata");
   let definition_userdata = lua.create_userdata(NativeStructDefinition{fields: native_fields})?;
 
-  info!("Setting user values on native struct definition userdata");
+  debug!("Setting user values on native struct definition userdata");
   for pair in fields.pairs::<String, mlua::Table>() {
     let (key, field_definition) = match pair {
       Ok(pair) => pair,
@@ -298,7 +298,7 @@ pub fn create_native_struct_definition_fn<'lua>(lua: &'lua Lua, fields: mlua::Ta
     }
   }
 
-  info!("Successfully created native struct definition");
+  debug!("Successfully created native struct definition");
   Ok(definition_userdata)
 }
 

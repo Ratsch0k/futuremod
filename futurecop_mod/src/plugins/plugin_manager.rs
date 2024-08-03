@@ -110,7 +110,7 @@ struct PersistentPluginStates {
 
 impl PersistentPluginStates {
     pub fn new(path: &Path) -> Result<PersistentPluginStates, anyhow::Error> {
-        info!("Reading plugin states from '{}'", path.display());
+        debug!("Reading plugin states from '{}'", path.display());
 
         let states: HashMap<String, PersistentPluginState> = match fs::read_to_string(path) {
             Ok(content) => serde_json::from_str(&content).map_err(|e| anyhow!("could not parse the plugin states file: {}", e.to_string()))?,
@@ -215,7 +215,7 @@ impl PluginManager {
                   Ok(path) => match path.path().is_dir() {
                       true => Some(path),
                       false => {
-                          info!("Found file '{:?}' in plugins directory, skipping...", path);
+                          debug!("Found file '{:?}' in plugins directory, skipping...", path);
                           None
                       },
                   },
@@ -228,7 +228,7 @@ impl PluginManager {
 
       let mut plugins: HashMap<String, Plugin> = HashMap::new();
 
-      info!("Loading plugin list");
+      debug!("Loading plugin list");
       for plugin_folder in plugin_directories {
           debug!("Discovered plugin folder {:?}", plugin_folder);
 
@@ -267,7 +267,7 @@ impl PluginManager {
 
       info!("Loading plugins");
       for (name, plugin) in plugins.iter_mut() {
-        info!("Loading plugin {}", name);
+        debug!("Loading plugin {}", name);
 
         let state = match persistent_states.get_state(name) {
             None => {
@@ -417,7 +417,7 @@ impl PluginManager {
     let destination = self.plugins_directory.clone().join(plugin_folder_name);
     debug!("Plugin folder will be '{}'", destination.display());
 
-    info!("Copying files from plugin package to destination");
+    debug!("Copying files from plugin package to destination");
     for file in WalkDir::new(folder).into_iter().filter_map(|e| e.ok()) {
         let path = file.path();
 
@@ -441,7 +441,7 @@ impl PluginManager {
         }
     }
     
-    info!("Copying finished, loading plugin");
+    debug!("Copying finished, loading plugin");
     // Create a new plugin info struct based on the freshly copied plugin.
     // Since the plugin info contains the current location of the plugin, reusing the original plugin
     // info is not possible.

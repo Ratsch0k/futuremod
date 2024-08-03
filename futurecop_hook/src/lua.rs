@@ -9,7 +9,7 @@ use crate::native::{memory_copy, Hook};
 
 /// Create a hook on any function with a given lua function.
 pub fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_name, callback): (u32, Vec<String>, String, Function)) -> Result<(), mlua::Error> {
-  info!("Creating hook on {:#08x} with type {:?} -> {}", address, arg_type_names, return_type_name);
+  debug!("Creating hook on {:#08x} with type {:?} -> {}", address, arg_type_names, return_type_name);
 
   // Parse parameter and return types
   let return_type = match Type::try_from_str(return_type_name.as_str()) {

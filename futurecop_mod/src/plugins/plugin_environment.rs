@@ -185,7 +185,7 @@ impl PluginEnvironment {
     let lua_ref = lua.clone();
 
     let require_fn = lua.create_function(move |lua, name: String| {
-      info!("Plugin '{}' required {}", plugin_name, name);
+      debug!("Plugin '{}' required {}", plugin_name, name);
 
       // Check if a library with the given name exists
       if let Some(library) = libraries.get(name.as_str()) {
