@@ -65,10 +65,11 @@ When Future Cop runs, the GUI injects the mod into Future Cop and waits for the 
 The mod hooks itself into the game, initializes the internal plugin manager, loads and enables installed plugins, and starts a local webserver.
 When the mod finishes initializing, the GUI connects to the mod's webserver and now acts as the plugin manager.
 
-FutureMod is written in Rust and consists of three packages:
+FutureMod is written in Rust and consists of four packages:
 - `futurecop_injector`: The FutureMod GUI. Injects `futurecop_mod` and allows users to interact with it.
 - `futurecop_mod`: The actual mod that is injected into Future Cop to run plugins
 - `futurecop_data`: Data and code shared by both `futurecop_injector` and `futurecop_mod`
+- `futurecop_hook`: This package solely exists to circumvent issues with rust's optimizations in direct memory and pointer manipulation when hooking and converting between native and lua values. Functions and logic where rust incorrectly (I assume, might be bad code) optimizes code are put into this package. Optimizations are completely disabled for this package. Putting that code into its own package allows use to still optimize the rest of the DLL.
 
 ### GUI/Injector
 The GUI powered by [iced](https://iced.rs/) using a partially custom theme.
