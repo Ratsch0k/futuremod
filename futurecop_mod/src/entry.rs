@@ -131,10 +131,15 @@ fn handle_player_sprint(player_id: u8, player_entity: &mut PlayerEntity) {
     unsafe {
         player_sprint_key = match &CONFIG {
             None => return,
-            Some(c) => match player_id {
-                1 => c.player_one.sprint_key,
-                2 => c.player_two.sprint_key,
-                _ => return,
+            Some(c) => match &c.sprint_config {
+                Some(sprint_config) =>  match player_id {
+                    1 => sprint_config.player_one,
+                    2 => sprint_config.player_two,
+                    _ => return,
+                },
+                None => {
+                    return;
+                },
             }
         };
 

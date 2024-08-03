@@ -53,7 +53,7 @@ fn serve(config: Config) -> Result<(), Error> {
                 .route("/plugin/info", put(get_plugin_info))
                 .route("/log", get(log_handler));
 
-            axum::Server::bind(&format!("0.0.0.0:{}", config.server.port).parse().unwrap())
+            axum::Server::bind(&format!("{}:{}", config.server.host, config.server.port).parse().unwrap())
                 .serve(app.into_make_service())
                 .await
                 .unwrap();
