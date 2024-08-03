@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use futurecop_data::plugin::Plugin;
+use futuremod_data::plugin::Plugin;
 use iced::{alignment::{Horizontal, Vertical}, widget::{checkbox, column, container, row, scrollable::{Alignment, Direction, Properties, Scrollable}, text}, Command, Length, Renderer};
 use iced_aw::{menu::{Item, Menu}, menu_bar, menu_items, BootstrapIcon};
 
@@ -153,7 +153,7 @@ impl Logs {
                       .font(bold())
                   },
                   None => {
-                    text(&message.target.replace("futurecop_mod::", ""))
+                    text(&message.target.replace("futuremod_engine::", ""))
                   }
                 };
 

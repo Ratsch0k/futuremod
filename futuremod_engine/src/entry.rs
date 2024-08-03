@@ -5,7 +5,7 @@ use num;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use crate::{api::graphics::{self, EXAMPLE_ITEM}, config::Config, futurecop::*, input::KeyState, plugins::plugin_manager::GlobalPluginManager, util::resume_all_threads};
 use crate::futurecop::global::*;
-use futurecop_hook::native::{install_hook, Hook};
+use futuremod_hook::native::{install_hook, Hook};
 use crate::server;
 use crate::plugins::PluginManager;
 

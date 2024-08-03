@@ -14,7 +14,7 @@ pub enum PluginInfoError {
 
 /// Load the plugin info file from the given plugin folder.
 /// If no plugin info file exists, returns an error.
-pub fn load_plugin_info(path: PathBuf) -> Result<futurecop_data::plugin::PluginInfo, PluginInfoError> {
+pub fn load_plugin_info(path: PathBuf) -> Result<futuremod_data::plugin::PluginInfo, PluginInfoError> {
     let path = path.canonicalize().map_err(|e| PluginInfoError::Other(format!("Could not access plugin folder: {:?}", e)))?;
 
     let info_file_path = Path::join(&path, "info.toml");
@@ -28,12 +28,12 @@ pub fn load_plugin_info(path: PathBuf) -> Result<futurecop_data::plugin::PluginI
       Err(e) => return Err(PluginInfoError::Other(format!("Could not read the plugin's info file: {:?}", e)))
     };
 
-    let plugin_info: futurecop_data::plugin::PluginInfoContent = match toml::from_str(content.as_str()) {
+    let plugin_info: futuremod_data::plugin::PluginInfoContent = match toml::from_str(content.as_str()) {
       Ok(v) => v,
       Err(e) => return Err(PluginInfoError::Format(format!("Format of info file is incorrect: {:?}", e))),
     };
 
-    Ok(futurecop_data::plugin::PluginInfo{
+    Ok(futuremod_data::plugin::PluginInfo{
       path,
       name: plugin_info.name,
       authors: plugin_info.authors,

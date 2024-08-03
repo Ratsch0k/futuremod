@@ -32,7 +32,7 @@ fn default_mod_path() -> String {
     }
   };
 
-  current_dir_path.push("futurecop_mod.dll");
+  current_dir_path.push("futuremod_engine.dll");
 
   let current_dir = current_dir_path.to_str().expect("Could not convert the path to the current directory to a string");
 

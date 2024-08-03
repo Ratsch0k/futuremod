@@ -1,5 +1,5 @@
 [package]
-name = "futurecop-mod-injector"
+name = "futuremod"
 version = "0.1.0"
 edition = "2021"
 
@@ -20,7 +20,7 @@ chrono = "0.4.38"
 clap = { version = "4.4.18", features = ["derive"] }
 dialog = "0.3.0"
 fern = {version = "0.6.2", features = ["colored"]}
-futurecop_data = { version = "0.1.0", path = "../futurecop_data" }
+futuremod_data = { version = "0.1.0", path = "../futuremod_data" }
 futures = "0.3.30"
 humantime = "2.1.0"
 iced = {version = "0.12.0", features = ["tokio"]}

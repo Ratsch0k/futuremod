@@ -3,7 +3,7 @@ use anyhow::{Error, anyhow};
 use axum::{
     body::Bytes, extract::{ws::{Message, WebSocket, WebSocketUpgrade}, BodyStream}, http::StatusCode, response::{IntoResponse, Response}, routing::{get, post, put}, BoxError, Json, Router,
 };
-use futurecop_data::plugin::PluginInfo;
+use futuremod_data::plugin::PluginInfo;
 use kv::Key;
 use log::*;
 use serde::{Serialize, Deserialize};
@@ -225,11 +225,11 @@ fn with_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error> where F: Fn(&Plug
     }
 }
 
-async fn get_plugins() -> Result<Json<HashMap<String, futurecop_data::plugin::Plugin>>, String> {
+async fn get_plugins() -> Result<Json<HashMap<String, futuremod_data::plugin::Plugin>>, String> {
     GlobalPluginManager::with_plugin_manager(|plugin_manager| {
         let plugins = plugin_manager.get_plugins();
 
-        let mut plugin_response: HashMap<String, futurecop_data::plugin::Plugin> = HashMap::new();
+        let mut plugin_response: HashMap<String, futuremod_data::plugin::Plugin> = HashMap::new();
 
         for (name, plugin) in plugins.iter() {
             plugin_response.insert(name.clone(), plugin.clone().into());

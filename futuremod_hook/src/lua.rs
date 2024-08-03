@@ -1,6 +1,6 @@
 use std::arch::asm;
 
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use mlua::{Function, Lua, MultiValue, UserData};
 use windows::Win32::System::Memory::{VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE};
 

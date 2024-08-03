@@ -1329,7 +1329,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "futurecop-mod-injector"
+name = "futuremod"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1338,7 +1338,7 @@ dependencies = [
  "clap",
  "dialog",
  "fern",
- "futurecop_data",
+ "futuremod_data",
  "futures",
  "humantime",
  "iced",
@@ -1357,7 +1357,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "futurecop_data"
+name = "futuremod_data"
 version = "0.1.0"
 dependencies = [
  "axum 0.7.4",
@@ -1366,19 +1366,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "futurecop_hook"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "iced-x86",
- "lazy_static",
- "log",
- "mlua",
- "windows 0.52.0",
-]
-
-[[package]]
-name = "futurecop_mod"
+name = "futuremod_engine"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1386,8 +1374,8 @@ dependencies = [
  "axum-extra",
  "chrono",
  "device_query",
- "futurecop_data",
- "futurecop_hook",
+ "futuremod_data",
+ "futuremod_hook",
  "futures",
  "headers",
  "humantime",
@@ -1409,6 +1397,18 @@ dependencies = [
  "walkdir",
  "windows 0.52.0",
  "zip",
+]
+
+[[package]]
+name = "futuremod_hook"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "iced-x86",
+ "lazy_static",
+ "log",
+ "mlua",
+ "windows 0.52.0",
 ]
 
 [[package]]

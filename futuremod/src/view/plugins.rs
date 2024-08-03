@@ -4,7 +4,7 @@ use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, containe
 use iced_aw::{modal, BootstrapIcon};
 use log::{info, warn};
 use rfd::FileDialog;
-use futurecop_data::plugin::*;
+use futuremod_data::plugin::*;
 
 use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, util::wait_for_ms, widget::{button, icon, icon_with_style, Column, Element, Row}};
 use crate::theme::Button;

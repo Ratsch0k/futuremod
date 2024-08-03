@@ -1,5 +1,5 @@
 use std::{fs, path::PathBuf, sync::Arc};
-use futurecop_data::plugin::{PluginError, PluginInfo};
+use futuremod_data::plugin::{PluginError, PluginInfo};
 use log::*;
 use mlua::{OwnedFunction, Lua, Table, Function};
 use serde::{ser::SerializeStruct, Serialize};
@@ -33,9 +33,9 @@ pub struct Plugin {
     lua: Arc<Lua>,
 }
 
-impl Into<futurecop_data::plugin::Plugin> for Plugin {
-    fn into(self) -> futurecop_data::plugin::Plugin {
-        futurecop_data::plugin::Plugin {
+impl Into<futuremod_data::plugin::Plugin> for Plugin {
+    fn into(self) -> futuremod_data::plugin::Plugin {
+        futuremod_data::plugin::Plugin {
             enabled: self.enabled,
             state: self.state.into(),
             info: self.info.into(),
@@ -52,12 +52,12 @@ pub enum PluginState {
     Loaded(PluginContext),
 }
 
-impl Into<futurecop_data::plugin::PluginState> for PluginState {
-    fn into(self) -> futurecop_data::plugin::PluginState {
+impl Into<futuremod_data::plugin::PluginState> for PluginState {
+    fn into(self) -> futuremod_data::plugin::PluginState {
         match self {
-            PluginState::Unloaded => futurecop_data::plugin::PluginState::Unloaded,
-            PluginState::Error(e) => futurecop_data::plugin::PluginState::Error(e),
-            PluginState::Loaded(c) => futurecop_data::plugin::PluginState::Loaded(c.into())
+            PluginState::Unloaded => futuremod_data::plugin::PluginState::Unloaded,
+            PluginState::Error(e) => futuremod_data::plugin::PluginState::Error(e),
+            PluginState::Loaded(c) => futuremod_data::plugin::PluginState::Loaded(c.into())
         }
     }
 }
@@ -78,9 +78,9 @@ pub struct PluginContext {
 }
 
 
-impl Into<futurecop_data::plugin::PluginContext> for PluginContext {
-    fn into(self) -> futurecop_data::plugin::PluginContext {
-        futurecop_data::plugin::PluginContext {
+impl Into<futuremod_data::plugin::PluginContext> for PluginContext {
+    fn into(self) -> futuremod_data::plugin::PluginContext {
+        futuremod_data::plugin::PluginContext {
             on_load: self.on_load.is_some(),
             on_unload: self.on_unload.is_some(),
             on_update: self.on_update.is_some(),

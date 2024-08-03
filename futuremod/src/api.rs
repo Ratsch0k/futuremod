@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use tokio::fs;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-use futurecop_data::plugin::{Plugin, PluginInfo};
+use futuremod_data::plugin::{Plugin, PluginInfo};
 
 
 pub fn build_url(path: &str) -> String {

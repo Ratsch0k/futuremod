@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::{collections::HashMap, fs};
-use futurecop_data::plugin::PluginError;
+use futuremod_data::plugin::PluginError;
 use log::*;
 use mlua::{Lua, StdLib};
 use serde::{Deserialize, Serialize};

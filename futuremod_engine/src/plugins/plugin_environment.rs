@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug, fs, path::{Path, PathBuf}, sync::{Ar
 use anyhow::bail;
 use log::*;
 use mlua::{Lua, OwnedTable};
-use futurecop_data::plugin::{PluginInfo, PluginDependency};
+use futuremod_data::plugin::{PluginInfo, PluginDependency};
 use super::library::{dangerous::create_dangerous_library, game::create_game_library, input::create_input_library, matrix::create_matrix_library, system::create_system_library, ui::create_ui_library};
 
 /// Holds the entire plugin environment.

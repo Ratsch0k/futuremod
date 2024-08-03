@@ -3,7 +3,7 @@ use std::{cell::Ref, collections::HashMap};
 use log::debug;
 use mlua::{AnyUserData, AnyUserDataExt, Lua, MetaMethod, UserData};
 
-use futurecop_hook::types::{lua_to_native, native_to_lua, Type};
+use futuremod_hook::types::{lua_to_native, native_to_lua, Type};
 
 use crate::plugins::library::LuaResult;
 

@@ -1,4 +1,4 @@
-use futurecop_hook::types::{Type, MAX_STRING};
+use futuremod_hook::types::{Type, MAX_STRING};
 use log::debug;
 use mlua::{AnyUserDataExt, Lua};
 

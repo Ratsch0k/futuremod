@@ -1062,7 +1062,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "futurecop-mod-injector"
+name = "futuremod"
 version = "0.1.0"
 dependencies = [
  "anyhow",

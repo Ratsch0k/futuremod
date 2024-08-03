@@ -1,5 +1,5 @@
 [package]
-name = "futurecop_mod"
+name = "futuremod_engine"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,8 +14,8 @@ axum = {version = "0.6.20", features = ["ws", "headers"]}
 axum-extra = {version = "0.8.0"}
 chrono = "0.4.31"
 device_query = "2.0.0"
-futurecop_hook = { version = "0.1.0", path = "../futurecop_hook" }
-futurecop_data = { version = "0.1.0", path = "../futurecop_data" }
+futuremod_hook = { version = "0.1.0", path = "../futuremod_hook" }
+futuremod_data = { version = "0.1.0", path = "../futuremod_data" }
 futures = "0.3.30"
 headers = "0.3.9"
 humantime = "2.1.0"
