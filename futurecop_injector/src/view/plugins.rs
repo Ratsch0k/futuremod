@@ -333,32 +333,37 @@ impl Plugins {
                   column![
                   text("Confirm installation").size(24.0),
                   Space::with_height(12.0),
-                  scrollable(
-                    Column::new()
-                      .push(text(format!("Are you sure you want to install the plugin '{}'.", confirmation_prompt.plugin.name.clone())))
-                      .push_maybe(warning)
-                      .push(column![
-                        text("General Information").size(24),
-                        text(format!("Name: {}", confirmation_prompt.plugin.name.clone())),
-                        text(format!("Authors: {}", confirmation_prompt.plugin.authors.clone().join(", "))),
-                        text(format!("Version: {}", confirmation_prompt.plugin.version)),
-                      ].spacing(4))
-                      .push(column![
-                        text("Description").size(24),
-                        text(
-                          if confirmation_prompt.plugin.description.len() <= 0 {
-                            String::from("No description")
-                          } else {
-                            confirmation_prompt.plugin.description.clone()
-                          }
-                        ),
-                      ].spacing(4))
-                      .push(column![
-                        text("Dependencies").size(24),
-                        dependencies_list(&confirmation_prompt.plugin.dependencies),
-                      ].spacing(4))
-                      .spacing(24),
-                  ),
+                  container(
+                    scrollable(
+                      Column::new()
+                        .push(text(format!("Are you sure you want to install the plugin '{}'.", confirmation_prompt.plugin.name.clone())))
+                        .push_maybe(warning)
+                        .push(column![
+                          text("General Information").size(24),
+                          text(format!("Name: {}", confirmation_prompt.plugin.name.clone())),
+                          text(format!("Authors: {}", confirmation_prompt.plugin.authors.clone().join(", "))),
+                          text(format!("Version: {}", confirmation_prompt.plugin.version)),
+                        ].spacing(4))
+                        .push(column![
+                          text("Description").size(24),
+                          text(
+                            if confirmation_prompt.plugin.description.len() <= 0 {
+                              String::from("No description")
+                            } else {
+                              confirmation_prompt.plugin.description.clone()
+                            }
+                          ),
+                        ].spacing(4))
+                        .push(column![
+                          text("Dependencies").size(24),
+                          dependencies_list(&confirmation_prompt.plugin.dependencies),
+                        ].spacing(4))
+                        .spacing(24)
+                        .padding([0, 16, 0, 8]),
+                    )
+                  )
+                  .height(Length::Fill)
+                  .padding([0, 0, 8, 0]),
                   row![
                     Space::with_width(Length::Fill),
                     button(text("Cancel")).style(Button::Destructive).on_press(Message::CancelInstallation),

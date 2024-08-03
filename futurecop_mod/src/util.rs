@@ -8,6 +8,20 @@ lazy_static!{
     static ref HOOKS: Arc<Mutex<HashMap<u32, Arc<Mutex<Inner>>>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
+/// Byte-wise copy `length` bytes from `src` to `dest`.
+/// 
+/// Unfortunately, we cannot use `std::ptr::copy_nonoverlapping()` to copy bytes because we use it to copy bytes
+/// to arbitrary memory addresses that don't match with the alignment Rust expects.
+/// Thus, we use this custom (simple) function to copy bytes.
+pub unsafe fn memory_copy(src: u32, dest: u32, length: u32) {
+    let source_ptr = src as *const u8;
+    let dest_ptr = dest as * mut u8;
+
+    for i in 0..length as isize {
+        *dest_ptr.offset(i) = *source_ptr.offset(i);
+    }
+}
+
 pub unsafe fn install_hook<Fn>(target_fn_address: usize, hook_fn: Fn) -> Option<Fn> {
     let mut prelude_size = 0;
     let required_bytes = 5;
@@ -39,7 +53,7 @@ pub unsafe fn install_hook<Fn>(target_fn_address: usize, hook_fn: Fn) -> Option<
     let trampoline = VirtualAlloc(None, trampoline_size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     
     // Write first bytes from the target function into the trampoline memory
-    std::ptr::copy_nonoverlapping(target_fn_address as *const c_void, trampoline, prelude_size);
+    memory_copy(target_fn_address as *const c_void as u32, trampoline as u32, prelude_size as u32);
 
     // Calculate the distance between the hook function and the target function
     let trampoline_dst = target_fn_address as usize + prelude_size;
@@ -51,7 +65,7 @@ pub unsafe fn install_hook<Fn>(target_fn_address: usize, hook_fn: Fn) -> Option<
     *trampoline_jmp_address = 0xe9u8;
 
     // Write the jump address into the trampoline
-    std::ptr::copy_nonoverlapping(&trampoline_delta, (trampoline as usize + prelude_size as usize + 1) as *mut isize, 4);
+    memory_copy(&trampoline_delta as *const isize as *const u8 as u32, (trampoline as usize + prelude_size as usize + 1) as *mut u8 as u32, 4);
 
     // Set permissions on memory of target function to be able to write into it
     let mut old_protect: PAGE_PROTECTION_FLAGS = Default::default();
@@ -65,7 +79,7 @@ pub unsafe fn install_hook<Fn>(target_fn_address: usize, hook_fn: Fn) -> Option<
     // Write jmp instruction from target to hook into first bytes of target function
     let target_jmp_address = target_fn_address as *mut u8;
     *target_jmp_address = 0xe9;
-    std::ptr::copy_nonoverlapping(&jmp_delta, (target_fn_address as usize + 1) as *mut isize, 1);
+    memory_copy(&jmp_delta as *const isize as *const u8 as u32, (target_fn_address as usize + 1) as *mut isize as *mut u8 as u32, 4);
 
     // If prelude is larger than 5 bytes, fill the left over bytes with noops to avoid broken instructions
     if prelude_size > 5 {
@@ -248,7 +262,7 @@ impl Hook {
         *target_trampoline_jmp_address = 0xe9u8;
 
         // Write the jump address into the trampoline
-        std::ptr::copy_nonoverlapping(&target_trampoline_delta, (target_trampoline as usize + prelude_size as usize + 1) as *mut isize, 1);
+        memory_copy(&target_trampoline_delta as *const isize as *const u8 as u32, (target_trampoline as usize + prelude_size as usize + 1) as *mut u8 as u32, 4);
 
         // New approach
         // Copy stack frame of caller without the actual return address.
@@ -300,14 +314,14 @@ impl Hook {
 
         current_offset += hook_trampoline_first.len();
 
-        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_address, hook_trampoline.add(current_offset) as *mut u32, 4);
+        memory_copy(&hook_trampoline_jump_address as *const u32 as u32, hook_trampoline.add(current_offset) as *mut u32 as u32, 4);
         current_offset += 4;
 
         // Push data
         let push_data_instruction_address = hook_trampoline.add(current_offset) as *mut u8;
         *push_data_instruction_address = 0x68;
         current_offset += 1;
-        std::ptr::copy_nonoverlapping(&data, hook_trampoline.add(current_offset) as *mut u32, 1);
+        memory_copy(&data as *const u32 as u32, hook_trampoline.add(current_offset) as u32, 4);
         current_offset += 4;
 
         for i in 0..hook_trampoline_second.len() {
@@ -321,7 +335,7 @@ impl Hook {
         let hook_trampoline_jump_src = hook_trampoline.add(current_offset + 4);
         let hook_trampoline_jump_delta = hook_trampoline_jump_dst as isize - hook_trampoline_jump_src as isize;
 
-        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_delta, hook_trampoline.add(current_offset) as *mut isize, 1);
+        memory_copy(&hook_trampoline_jump_delta as *const isize as u32, hook_trampoline.add(current_offset) as u32, 4);
 
         current_offset += 4;
 
@@ -337,7 +351,7 @@ impl Hook {
         // Write jmp instruction from target to hook into first bytes of target function
         let target_jmp_address = inner.address as *mut u8;
         *target_jmp_address = 0xe9;
-        std::ptr::copy_nonoverlapping(&jmp_delta, (inner.address as usize + 1) as *mut isize, 1);
+        memory_copy(&jmp_delta as *const isize as u32, (inner.address as usize + 1) as u32, 4);
 
         // If prelude is larger than 5 bytes, fill the left over bytes with noops to avoid broken instructions
         if prelude_size > 5 {
@@ -407,7 +421,7 @@ impl Hook {
         *target_trampoline_jmp_address = 0xe9u8;
 
         // Write the jump address into the trampoline
-        std::ptr::copy_nonoverlapping(&target_trampoline_delta, (target_trampoline as usize + prelude_size as usize + 1) as *mut isize, 1);
+        memory_copy(&target_trampoline_delta as *const isize as u32, (target_trampoline as usize + prelude_size as usize + 1) as u32, 4);
 
         // Create the launchpad (function that calls the hook)
         // Must contain the following assembly
@@ -428,7 +442,7 @@ impl Hook {
             *trampoline_address = hook_trampoline_start[i];
         }
 
-        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_address, hook_trampoline.add(2) as *mut u32, 4);
+        memory_copy(&hook_trampoline_jump_address as *const u32 as u32, hook_trampoline.add(2) as u32, 4);
 
         for i in 0..hook_trampoline_jump.len() {
             let trampoline_address = hook_trampoline.add(6 + i) as *mut u8;
@@ -443,7 +457,7 @@ impl Hook {
         let hook_trampoline_jump_src = hook_trampoline.add(12);
         let hook_trampoline_jump_delta = hook_trampoline_jump_dst as isize - hook_trampoline_jump_src as isize;
 
-        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_delta, hook_trampoline.add(8) as *mut isize, 1);
+        memory_copy(&hook_trampoline_jump_delta as *const isize as u32, hook_trampoline.add(8) as u32, 4);
 
 
         let jmp_dst = hook_trampoline;
@@ -453,7 +467,7 @@ impl Hook {
         // Write jmp instruction from target to hook into first bytes of target function
         let target_jmp_address = inner.address as *mut u8;
         *target_jmp_address = 0xe9;
-        std::ptr::copy_nonoverlapping(&jmp_delta, (inner.address as usize + 1) as *mut isize, 1);
+        memory_copy(&jmp_delta as *const isize as u32, (inner.address as usize + 1) as u32, 4);
 
         // If prelude is larger than 5 bytes, fill the left over bytes with noops to avoid broken instructions
         if prelude_size > 5 {
@@ -523,7 +537,7 @@ impl Hook {
         *target_trampoline_jmp_address = 0xe9u8;
 
         // Write the jump address into the trampoline
-        std::ptr::copy_nonoverlapping(&target_trampoline_delta, (target_trampoline as usize + prelude_size as usize + 1) as *mut isize, 1);
+        memory_copy(&target_trampoline_delta as *const isize as u32, (target_trampoline as usize + prelude_size as usize + 1) as u32, 4);
 
         // New approach
         // Copy stack frame of caller without the actual return address.
@@ -574,7 +588,7 @@ impl Hook {
 
         current_offset += hook_trampoline_first.len();
 
-        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_address, hook_trampoline.add(current_offset) as *mut u32, 4);
+        memory_copy(&hook_trampoline_jump_address as *const u32 as u32, hook_trampoline.add(current_offset) as u32, 4);
         current_offset += 4;
 
         for i in 0..hook_trampoline_second.len() {
@@ -592,7 +606,7 @@ impl Hook {
         let hook_trampoline_jump_src = hook_trampoline.add(current_offset + 4);
         let hook_trampoline_jump_delta = hook_trampoline_jump_dst as isize - hook_trampoline_jump_src as isize;
 
-        std::ptr::copy_nonoverlapping(&hook_trampoline_jump_delta, hook_trampoline.add(current_offset) as *mut isize, 1);
+        memory_copy(&hook_trampoline_jump_delta as *const isize as u32, hook_trampoline.add(current_offset) as u32, 4);
 
         current_offset += 4;
 
@@ -608,7 +622,7 @@ impl Hook {
         // Write jmp instruction from target to hook into first bytes of target function
         let target_jmp_address = inner.address as *mut u8;
         *target_jmp_address = 0xe9;
-        std::ptr::copy_nonoverlapping(&jmp_delta, (inner.address as usize + 1) as *mut isize, 1);
+        memory_copy(&jmp_delta as *const isize as u32, (inner.address as usize + 1) as u32, 4);
 
         // If prelude is larger than 5 bytes, fill the left over bytes with noops to avoid broken instructions
         if prelude_size > 5 {
