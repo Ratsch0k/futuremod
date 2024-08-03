@@ -24,9 +24,9 @@ git clone https://github.com/Ratsch0k/futuremod
 # Build FutureMod
 cargo build --release
 ```
-After FutureMod was build successfully, its executable should be at `<repository>/target/i686-pc-windows-msvc/release/futurecop-mod-injector.exe`.
+After FutureMod was build successfully, its executable should be at `<repository>/target/i686-pc-windows-msvc/release/futuremod.exe`.
 
-If you move the executable, make sure to also move the file `futurecop_mod.dll` (located in the same folder as the executable) alongside because it is required by FutureMod.
+If you move the executable, make sure to also move the file `futuremod_engine.dll` (located in the same folder as the executable) alongside because it is required by FutureMod.
 However, you don't have to move the DLL.
 By default, FutureMod expects the DLL to be in the same directory.
 If it isn't, it prompts you to manually select the path to the DLL.
@@ -36,7 +36,7 @@ FutureMod automatically creates the config file the first time you start it or i
 The config file is in the same directory as FutureMod and called `config.json`.
 
 ## Usage
-To use FutureMod simply run `futurecop-mod-injector.exe` before or after you started the game.
+To use FutureMod simply run `futuremod.exe` before or after you started the game.
 When FutureMod was able to successfully inject into the game it presents with the following overview.
 ![Main View of the FutureMod GUI](./resources/main-ui.png)
 
@@ -66,24 +66,24 @@ The mod hooks itself into the game, initializes the internal plugin manager, loa
 When the mod finishes initializing, the GUI connects to the mod's webserver and now acts as the plugin manager.
 
 FutureMod is written in Rust and consists of four packages:
-- `futurecop_injector`: The FutureMod GUI. Injects `futurecop_mod` and allows users to interact with it.
-- `futurecop_mod`: The actual mod that is injected into Future Cop to run plugins
-- `futurecop_data`: Data and code shared by both `futurecop_injector` and `futurecop_mod`
-- `futurecop_hook`: This package solely exists to circumvent issues with rust's optimizations in direct memory and pointer manipulation when hooking and converting between native and lua values. Functions and logic where rust incorrectly (I assume, might be bad code) optimizes code are put into this package. Optimizations are completely disabled for this package. Putting that code into its own package allows use to still optimize the rest of the DLL.
+- `futuremod`: The FutureMod GUI. Injects `futuremod_engine` and allows users to interact with it.
+- `futuremod_engine`: The actual mod that is injected into Future Cop to run plugins
+- `futuremod_data`: Data and code shared by both `futuremod` and `futuremod_engine`
+- `futuremod_hook`: This package solely exists to circumvent issues with rust's optimizations in direct memory and pointer manipulation when hooking and converting between native and lua values. Functions and logic where rust incorrectly (I assume, might be bad code) optimizes code are put into this package. Optimizations are completely disabled for this package. Putting that code into its own package allows use to still optimize the rest of the DLL.
 
 ### GUI/Injector
 The GUI powered by [iced](https://iced.rs/) using a partially custom theme.
 It consists of several mostly independent views.
-Each view is located in the `views` directory at `futurecop_injector/src/view`.
+Each view is located in the `views` directory at `futuremod/src/view`.
 
 ### Mod
 The mod manages plugins, the plugin API that allows plugins to interact with Future Cop, and sets up a local webserver that the GUI can connect to.
 The mod injects itself into some of the game's logic and processes.
 However, all modifications are done in memory, and all game files are left untouched.
 
-All code for managing plugin's is located at `futurecop_mod/src/plugins`.
+All code for managing plugin's is located at `futuremod_engine/src/plugins`.
 The API is split into several libraries, each responsible for their own category of interaction.
-The code for the API libraries is located at `futurecop_mod/src/plugins/library`.
+The code for the API libraries is located at `futuremod_engine/src/plugins/library`.
 
 Lua plugins are powered by [mlua](https://github.com/mlua-rs/mlua) with _Luau_ support.
 
@@ -108,7 +108,7 @@ As the modding framework allows plugins to directly interact with the games code
 Therefore, specific libraries are marked as dangerous and if the user installs a plugin that depends on such a library the plugin manager will warn them.
 
 ### Example
-There are some example plugins in `futurecop_mod/examples/` that show how you could write your own plugins.
+There are some example plugins in `futuremod_engine/examples/` that show how you could write your own plugins.
 The most complex example is the example plugin **Custom Behavior**, which implements a completely custom actor/behavior that the player can interact with to heal themselves.
 The plugin makes heavy use of the _dangerous_ library to hook itself into the game's actor system and write and read from the game's memory.
 Moreover, it also shows how you can render 3D object.

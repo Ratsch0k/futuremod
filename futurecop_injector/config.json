@@ -1,6 +1,0 @@
-{
-    "modAddress": "127.0.0.1:8000",
-    "modPath": "..\\target\\i686-pc-windows-msvc\\debug\\futurecop_mod.dll",
-    "processName": "FCopLAPD.exe",
-    "requireAdmin": false
-}

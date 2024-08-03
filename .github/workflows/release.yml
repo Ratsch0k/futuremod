@@ -19,7 +19,7 @@ jobs:
       - name: Package files
         uses: vimtor/action-zip@v1.2
         with:
-          files: target/i686-pc-windows-msvc/debug/futurecop_mod.dll target/i686-pc-windows-msvc/debug/futurecop_mod.pdb target/i686-pc-windows-msvc/debug/futuremod.exe
+          files: target/i686-pc-windows-msvc/debug/futuremod_engine.dll target/i686-pc-windows-msvc/debug/futuremod_engine.pdb target/i686-pc-windows-msvc/debug/futuremod.exe
           dest: futuremod-debug.zip
       - name: Upload packaged debug release
         env:
@@ -38,7 +38,7 @@ jobs:
       - name: Package files
         uses: vimtor/action-zip@v1.2
         with:
-          files: target/i686-pc-windows-msvc/release/futurecop_mod.dll target/i686-pc-windows-msvc/release/futuremod.exe
+          files: target/i686-pc-windows-msvc/release/futuremod_engine.dll target/i686-pc-windows-msvc/release/futuremod.exe
           dest: futuremod.zip
       - name: Upload release build
         env:
