@@ -39,7 +39,7 @@ pub struct Config {
 fn default_server() -> ServerConfig {
     ServerConfig {
         port: 8000,
-        host: "0.0.0.0".to_string(),
+        host: "127.0.0.1".to_string(),
     }
 }
 
