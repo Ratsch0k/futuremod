@@ -126,11 +126,18 @@ function onLoad()
   customBehaviorFunctionNative = dangerous.createNativeFunction({"int", "int", "int", "int"}, "int", healingStationBehavior)
 end
 
+local behaviorHook = nil
 --- Called when the user enables this plugin.
 --- Hooking and other stuff intrusive things should only be performed if this function is called.
 --- Otherwise, the plugin is not enabled.
 function onEnable()
-  dangerous.hook(0x0041a950, {"int"}, "int", getBehaviorFunctionHook)
+  behaviorHook = dangerous.hook(0x0041a950, {"int"}, "int", getBehaviorFunctionHook)
+end
+
+--- Unhook hooks when the plugin is disabled.
+--- When using hooks, the plugin must ensure that it also unhooks them.
+function onDisable()
+  behaviorHook:unhook()
 end
 
 --- Usually, you should disable the plugin when this function is called.
