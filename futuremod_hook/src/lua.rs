@@ -8,7 +8,7 @@ use crate::types::{lua_to_native, lua_to_native_implied, native_to_lua, Type};
 use crate::native::{memory_copy, Hook};
 
 /// Create a hook on any function with a given lua function.
-pub fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_name, callback): (u32, Vec<String>, String, Function)) -> Result<(), mlua::Error> {
+pub fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type_name, callback): (u32, Vec<String>, String, Function)) -> Result<Hook, mlua::Error> {
   debug!("Creating hook on {:#08x} with type {:?} -> {}", address, arg_type_names, return_type_name);
 
   // Parse parameter and return types
@@ -179,12 +179,10 @@ pub fn hook_function<'lua>(lua: &'lua Lua, (address, arg_type_names, return_type
     let boxed_closure: Box<dyn FnMut(u32, u32) -> u32> = Box::new(hook_closure);
 
     match hook.set_closure(boxed_closure) {
-      Err(e) => warn!("Couldn't hook {:#08x}: {:?}", address, e),
-      _ => (),
+      Err(e) => Err(mlua::Error::RuntimeError(format!("Couldn't hook {:#08x}: {:?}", address, e))),
+      _ => Ok(hook),
     }
   }
-  
-  Ok(())
 }
 
 pub struct NativeFunction {
