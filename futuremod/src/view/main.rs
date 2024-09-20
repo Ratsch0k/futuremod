@@ -1,7 +1,7 @@
 use iced::{alignment::{Horizontal, Vertical}, widget::{column, container, text}, Alignment, Command, Length};
 use log::debug;
 
-use crate::{config::get_config, log_subscriber::{self, LogRecord}, theme::{Button, Theme}, widget::{button, Element}};
+use crate::{config::get_config, log_subscriber::{self, LogRecord}, theme::{Button, Theme, self}, widget::{button, Element}};
 
 use super::{logs, plugins};
 
@@ -39,13 +39,15 @@ pub struct Logs {
 pub struct Main {
     logs: Logs,
     view: Option<View>,
+    is_developer: bool,
 }
 
 impl Main {
-    pub fn new() -> Self {
+    pub fn new(is_developer: bool) -> Self {
         Main {
             logs: Logs { state: LogState::Disconnected, logs: Vec::new() },
             view: None,
+            is_developer,
         }
     }
 
@@ -120,7 +122,7 @@ impl Main {
             None => {
                 container(
                     column![
-                        text("FutureCop Mod").size(48),
+                        get_title(self.is_developer),
                         column![
                             menu_button("Plugins").on_press(Message::ToPlugins).style(Button::Primary),
                             menu_button("Logs").on_press(Message::ToLogs)
@@ -149,5 +151,18 @@ impl Main {
         let config = get_config();
         
         log_subscriber::connect(config.mod_address.clone()).map(Message::LogEvent)
+    }
+}
+
+/// Create the title element based on the developer mode.
+fn get_title(is_developer: bool) -> Element<'static, Message> {
+    match is_developer {
+        true => text("FutureCop Mod - Developer")
+            .size(48)
+            .style(theme::Text::Warn)
+            .into(),
+        false => text("FutureCop Mod")
+            .size(48)
+            .into(),
     }
 }
