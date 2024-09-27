@@ -14,7 +14,7 @@ pub enum PluginInfoError {
 
 /// Load the plugin info file from the given plugin folder.
 /// If no plugin info file exists, returns an error.
-pub fn load_plugin_info(path: PathBuf) -> Result<futuremod_data::plugin::PluginInfo, PluginInfoError> {
+pub fn load_plugin_info(path: &PathBuf) -> Result<futuremod_data::plugin::PluginInfo, PluginInfoError> {
     let path = path.canonicalize().map_err(|e| PluginInfoError::Other(format!("Could not access plugin folder: {:?}", e)))?;
 
     let info_file_path = Path::join(&path, "info.toml");
@@ -34,7 +34,7 @@ pub fn load_plugin_info(path: PathBuf) -> Result<futuremod_data::plugin::PluginI
     };
 
     Ok(futuremod_data::plugin::PluginInfo{
-      path,
+      path: path.clone(),
       name: plugin_info.name,
       authors: plugin_info.authors,
       version: plugin_info.version,

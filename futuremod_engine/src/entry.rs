@@ -53,6 +53,7 @@ pub fn main(config: Config) {
     // Initialize global plugin manager or panic
     match GlobalPluginManager::initialize(plugins_directory) {
         Err(e) => {
+            error!("error while initializing the global plugin manager: {}", e);
             panic!("error while initializing the global plugin manager: {}", e);
         },
         Ok(_) => (),

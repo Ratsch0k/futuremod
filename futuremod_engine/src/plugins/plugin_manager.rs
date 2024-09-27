@@ -4,14 +4,14 @@ use std::{collections::HashMap, fs};
 use futuremod_data::plugin::PluginError;
 use log::*;
 use mlua::{Lua, StdLib};
-use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 use crate::plugins::plugin_info::load_plugin_info;
 use regex::Regex;
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 
 use super::plugin::*;
 use super::plugin_info::PluginInfoError;
+use super::plugin_persistence::{PersistedPlugins, PersistentPluginState, PersistedPlugin};
 
 static mut GLOBAL_PLUGIN_MANAGER: OnceLock<Arc<Mutex<PluginManager>>> = OnceLock::new();
 
@@ -86,84 +86,35 @@ pub enum PluginInstallError {
     Copy(String),
     AlreadyInstalled,
     Plugin(String),
+    InvalidPluginFolder,
+    IO(String),
 }
 
-/// Persistence state of a plugin which indicates how a plugin should be loaded on the next start.
-/// 
-/// This doesn't reflect the actual plugin's state.
-/// For example, if a plugin was loaded and enabled but threw an error during the loading process
-/// and thus has now the state [`PluginState::Error`], it will have the state [`StoredPluginState::Disabled`].
-/// Rather, this states whether the plugin manager will load and/or enable the plugin when it starts the next time.
-/// This state is only updated due to the user's input.
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-enum PersistentPluginState {
-    Unloaded,
-    Disabled,
-    Enabled,
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistentPluginStates {
-    states: HashMap<String, PersistentPluginState>,
-    path: PathBuf,
-}
+fn add_plugin_to_persistence(persistence: &mut PersistedPlugins, plugin: &Plugin, state: PersistentPluginState) {
+    debug!("Adding plugin '{}' to persistence", plugin.info.name);
 
-impl PersistentPluginStates {
-    pub fn new(path: &Path) -> Result<PersistentPluginStates, anyhow::Error> {
-        debug!("Reading plugin states from '{}'", path.display());
+    let persisted_plugin = PersistedPlugin {
+        state,
+        in_dev_mode: plugin.in_dev_mode,
+    };
 
-        let states: HashMap<String, PersistentPluginState> = match fs::read_to_string(path) {
-            Ok(content) => serde_json::from_str(&content).map_err(|e| anyhow!("could not parse the plugin states file: {}", e.to_string()))?,
-            Err(_) => HashMap::new(),
-        };
-
-        Ok(PersistentPluginStates { states, path: path.to_path_buf() })
-    }
-
-    pub fn get_state(&self, name: &str) -> Option<&PersistentPluginState> {
-        self.states.get(name)
-    }
-
-    pub fn insert(&mut self, name: &str, state: PersistentPluginState) -> Result<(), anyhow::Error>{
-        self.states.insert(name.into(), state);
-
-        self.write_to_file()
-    }
-
-    pub fn update(&mut self, name: &str, state: PersistentPluginState) -> Result<(), anyhow::Error> {
-        let plugin_state = match self.states.get_mut(name) {
-            Some(p) => p,
-            None => bail!("Plugin doesn't exist"),
-        };
-
-        *plugin_state = state;
-
-        self.write_to_file()
-    }
-
-    pub fn write_to_file(&self) -> Result<(), anyhow::Error> {
-        let content = serde_json::to_string(&self.states).map_err(|e| anyhow!("could not serialize plugin states to string: {}", e.to_string()))?;
-
-        fs::write(&self.path, content).map_err(|e| anyhow!("could not persist change: {}", e.to_string()))
-    }
-
-    pub fn remove(&mut self, name: &str) -> Result<(), anyhow::Error> {
-        self.states.remove(name);
-
-        self.write_to_file()
+    if let Err(e) = persistence.insert(&plugin.info.name, persisted_plugin) {
+        warn!("Could not persist change: {}", e);
     }
 }
 
-fn persist_plugin_state_change(states: &mut PersistentPluginStates, plugin: &Plugin, state: PersistentPluginState) {
+fn persist_plugin_state_change(persistence: &mut PersistedPlugins, plugin: &Plugin, state: PersistentPluginState) {
     debug!("Changing persistence state of plugin {} to {:?}", plugin.info.name, state);
-    if let Err(e) = states.insert(&plugin.info.name, state) {
-        warn!("Could not persist change '{}' -> {:?}: {:?}", plugin.info.name, state, e);
+
+    if let Err(e) = persistence.update_state(&plugin.info.name, state) {
+        warn!("Could not persist change: {}", e);
     }
 }
 
-fn remove_plugin_from_persistence(states: &mut PersistentPluginStates, plugin_name: &str) {
+fn remove_plugin_from_persistence(persistence: &mut PersistedPlugins, plugin_name: &str) {
     debug!("Removing plugin {} from persistence", plugin_name);
-    if let Err(e) = states.remove(&plugin_name) {
+    if let Err(e) = persistence.remove(&plugin_name) {
         warn!("Could not write plugin persistence to file: {}", e);
     }
 }
@@ -179,7 +130,7 @@ pub struct PluginManager {
   //// Directory where the plugins are stored
   pub plugins_directory: PathBuf,
   /// Persistence state
-  persistent_states: PersistentPluginStates,
+  persistent_states: PersistedPlugins,
   /// Reference to lua
   lua: Arc<Lua>,
 }
@@ -206,13 +157,13 @@ impl PluginManager {
       }
 
       let plugin_states_file = Path::join(&plugins_directory, "plugins.json");
-      let mut persistent_states = PersistentPluginStates::new(&plugin_states_file).map_err(|e| PluginManagerError::Other(e.to_string()))?;
+      let mut persisted_plugins = PersistedPlugins::new(&plugin_states_file).map_err(|e| PluginManagerError::Other(e.to_string()))?;
 
       info!("Loading plugins from {:?}", plugins_directory);
       let plugin_directories = plugins_directory.read_dir().map_err(PluginManagerError::Io)?
           .filter_map(|path| {
               match path {
-                  Ok(path) => match path.path().is_dir() {
+                  Ok(path) => match path.path().is_dir() || junction::exists(path.path()).unwrap_or(false) {
                       true => Some(path),
                       false => {
                           debug!("Found file '{:?}' in plugins directory, skipping...", path);
@@ -230,11 +181,11 @@ impl PluginManager {
 
       debug!("Loading plugin list");
       for plugin_folder in plugin_directories {
-          debug!("Discovered plugin folder {:?}", plugin_folder);
+          debug!("Discovered plugin folder {}", plugin_folder.path().display());
 
           let plugin_folder_path = plugin_folder.path();
 
-          let plugin_info = match load_plugin_info(plugin_folder_path) {
+          let mut plugin_info = match load_plugin_info(&plugin_folder_path) {
             Ok(v) => v,
             Err(e) => {
                 warn!("Error while loading the plugin's info file: {:?}", e);
@@ -248,7 +199,17 @@ impl PluginManager {
           }
               
           debug!("Creating plugin {}", plugin_info.name);
-          let plugin: Plugin = Plugin::new(lua.clone(), plugin_info);
+          let in_dev_mode = match persisted_plugins.get_state(&plugin_info.name) {
+            Some(v) => v.in_dev_mode,
+            None => false,
+          };
+
+          // If plugin is in dev mode, adjust the plugin's path
+          if in_dev_mode {
+            plugin_info.path = plugin_folder.path();
+          }
+
+          let plugin: Plugin = Plugin::new(lua.clone(), plugin_info, in_dev_mode);
   
           match plugin.state {
               PluginState::Error(ref e) => {
@@ -269,12 +230,12 @@ impl PluginManager {
       for (name, plugin) in plugins.iter_mut() {
         debug!("Loading plugin {}", name);
 
-        let state = match persistent_states.get_state(name) {
+        let persisted_plugin = match persisted_plugins.get_state(name) {
             None => {
                 info!("Plugin was not in persistence file, adding it as disabled");
-                persistent_states.insert(&name, PersistentPluginState::Disabled).map_err(|e| PluginManagerError::Other(e.to_string()))?;
+                persisted_plugins.insert(&name, PersistedPlugin{ state: PersistentPluginState::Disabled, in_dev_mode: false }).map_err(|e| PluginManagerError::Other(e.to_string()))?;
 
-                PersistentPluginState::Disabled
+                PersistedPlugin {state: PersistentPluginState::Disabled, in_dev_mode: false }
             },
             Some(state) => state.clone(),
         };
@@ -293,7 +254,7 @@ impl PluginManager {
         };
 
         if success {
-            match state {
+            match persisted_plugin.state {
                 PersistentPluginState::Enabled => {
                     info!("Plugin was persisted as enabled, enabling plugin");
 
@@ -322,7 +283,7 @@ impl PluginManager {
       }
 
       Ok(
-          PluginManager { plugins, plugins_directory, lua, persistent_states }
+          PluginManager { plugins, plugins_directory, lua, persistent_states: persisted_plugins }
       )
   }
 
@@ -401,7 +362,7 @@ impl PluginManager {
   /// This means, that the plugin is loaded when installing, which will execute the plugin and it's main function.
   pub fn install_plugin_from_folder(&mut self, folder: &PathBuf) -> Result<(), PluginInstallError> {
     info!("Installing plugin from {}", folder.display());
-    let plugin_info = load_plugin_info(folder.clone()).map_err(PluginInstallError::InfoFile)?;
+    let plugin_info = load_plugin_info(&folder).map_err(PluginInstallError::InfoFile)?;
 
     if self.plugins.contains_key(&plugin_info.name) {
         warn!("Plugin '{}' already installed", plugin_info.name);
@@ -418,41 +379,79 @@ impl PluginManager {
     debug!("Plugin folder will be '{}'", destination.display());
 
     debug!("Copying files from plugin package to destination");
-    for file in WalkDir::new(folder).into_iter().filter_map(|e| e.ok()) {
-        let path = file.path();
-
-        let relative_path = match path.strip_prefix(folder) {
-            Ok(v) => v,
-            Err(err) => return Err(PluginInstallError::Copy(format!("Could not get relative path of {}: {}", path.display(), err.to_string()))),
-        };
-        let destination_path = Path::join(&destination.clone(), &relative_path);
-
-        if path.is_dir() {
-            match fs::create_dir_all(&destination_path) {
-                Err(err) => return Err(PluginInstallError::Copy(format!("Could not destination directory {}: {}", destination_path.display(), err.to_string()))),
-                _ => (),
-            }
-        } else if path.is_file() {
-        debug!("Copy {} to {}", path.display(), destination_path.display());
-            match fs::copy(path, destination_path) {
-                Err(err) => return Err(PluginInstallError::Copy(format!("Could not copy {}: {}", path.display(), err.to_string()))),
-                _ => (),
-            }
-        }
-    }
+    copy_plugin_directory_to_plugins_folder(&folder, &destination)?;
     
     debug!("Copying finished, loading plugin");
-    // Create a new plugin info struct based on the freshly copied plugin.
-    // Since the plugin info contains the current location of the plugin, reusing the original plugin
-    // info is not possible.
-    let plugin_info = load_plugin_info(destination).map_err(PluginInstallError::InfoFile)?;
+    
+    self.add_and_load_plugin_from_folder(&destination, false)?;
+
+    Ok(())
+  }
+
+  pub fn install_plugin_in_dev_mode(&mut self, folder: &PathBuf) -> Result<(), PluginInstallError> {
+    info!("Installing plugin in developer mode from '{}'", folder.display());
+
+    // Try to load the plugin information from the folder.
+    // If we can't load it, for whatever reason, only report the folder as being an invalid plugin folder.
+    // It should not be possible to detect what folders exists based on the response.
+    let plugin_info = load_plugin_info(&folder)
+        .map_err(|_| PluginInstallError::InvalidPluginFolder)?;
+
+    if self.plugins.contains_key(&plugin_info.name) {
+        warn!("Plugin '{}' already installed", plugin_info.name);
+        return Err(PluginInstallError::AlreadyInstalled);
+    }
+
+    let plugin_folder_name = match sanitize_name(&plugin_info.name) {
+        None => return Err(PluginInstallError::InvalidName),
+        Some(v) => v,
+    };
+    debug!("Plugin name '{}' sanitized to '{}'", plugin_info.name, plugin_folder_name);
+
+    let destination = self.plugins_directory.clone().join(plugin_folder_name);
+    debug!("Plugin folder will be '{}'", destination.display());
+
+    debug!("Creating a softlink from the plugin folder to the destination in the plugins folder");
+    softlink_plugin_directory_to_plugins_folder(&folder, &destination)?;
+    
+    debug!("Softlink successfully created");
+
+    info!("Installing plugin");
+    self.add_and_load_plugin_from_folder(&destination, true)?;
+
+    Ok(())
+  }
+
+  /// Add the plugin at in the given folder to the installed plugins and load it.
+  fn add_and_load_plugin_from_folder(&mut self, folder: &PathBuf, in_dev_mode: bool) -> Result<(), PluginInstallError> {
+    debug!("Adding plugin from '{}' to plugins", folder.display());
+    let mut plugin_info = load_plugin_info(folder).map_err(PluginInstallError::InfoFile)?;
+
+    // If the plugin is in dev mode, a junction is used.
+    // In this case, we cannot use the canonic path of the plugin since it would
+    // point to the original folder instead of the junction.
+    // The `load_plugin_info` uses the canonic path however.
+    // In this case, we change the path afterwards to fix this issue.
+    if in_dev_mode {
+        plugin_info.path = folder.clone();
+        debug!("Plugin installed in dev mode. Adjusting path to '{}'", plugin_info.path.display());
+    }
+
+    debug!("Plugin info: {:?}", plugin_info);
     let plugin_name = plugin_info.name.clone();
 
+    if self.plugins.contains_key(&plugin_name) {
+        info!("Cannot add plugin '{}' since its already installed", plugin_name);
+        return Err(PluginInstallError::AlreadyInstalled);
+    }
+
+    debug!("Create the plugin");
     // Create and load the plugin
-    let plugin = Plugin::new(self.lua.clone(), plugin_info);
-    persist_plugin_state_change(&mut self.persistent_states, &plugin, PersistentPluginState::Disabled);
+    let plugin = Plugin::new(self.lua.clone(), plugin_info, in_dev_mode);
+    add_plugin_to_persistence(&mut self.persistent_states, &plugin, PersistentPluginState::Disabled);
     self.plugins.insert(plugin_name.clone(), plugin);
 
+    debug!("Load the plugin");
     let plugin = self.plugins.get_mut(&plugin_name).unwrap();
     plugin.load().map_err(|e| PluginInstallError::Plugin(format!("{:?}", e)))?;
 
@@ -497,10 +496,12 @@ impl PluginManager {
     };
 
     // Persist change
+    debug!("Remove the plugin from persistence");
     remove_plugin_from_persistence(&mut self.persistent_states, &plugin.info.name);
 
     // We will execute the plugin's disable function just that it has a chance to be uninstalled cleanly.
     // However, we won't care if the plugin's disable function will throw an error and still remove it afterwards.
+    debug!("Disable plugin");
     if let Err(e) = plugin.disable() {
         warn!("Plugin {} threw an error while it was disabled: {:?}", name, e);
     };
@@ -508,28 +509,85 @@ impl PluginManager {
     // Unload the plugin.
     // This should drop all references to lua objects and also run lua's garbage collector.
     // However, it this call fails, removing the Plugin from the map should still work
+    debug!("Unload plugin");
     if let Err(e) = plugin.unload() {
         warn!("Plugin {} threw an error while unloading: {:?}", name, e);
     }
 
-    let plugin_path = plugin.info.path.clone();
-
+    // Delete the plugin folder
+    debug!("Delete plugin folder");
+    delete_plugin_folder(&plugin)?;
+    
     // Remove the plugin from the plugin map.
     // This should only return None due to race conditions.
     // In such cases, log it.
+    debug!("Remove plugin from list");
     if let None = self.plugins.remove(name) {
         warn!("Could not find plugin '{}' while removing it from the internal map", name);
     }
 
     // Ensure that all lua references and objects are destroyed properly.
+    debug!("Let lua garbage collect");
     let _ = self.lua.gc_collect();
     let _ = self.lua.gc_collect();
-
-    // Lastly, remove the plugin's file from the plugin folder
-    fs::remove_dir_all(plugin_path).map_err(PluginManagerError::Io)?;
 
     Ok(())
   }
+}
+
+fn copy_plugin_directory_to_plugins_folder(source: &PathBuf, destination: &PathBuf) -> Result<(), PluginInstallError> {
+    debug!("Copying files from plugin package to destination");
+    for file in WalkDir::new(source).into_iter().filter_map(|e| e.ok()) {
+        let path = file.path();
+
+        let relative_path = match path.strip_prefix(source) {
+            Ok(v) => v,
+            Err(err) => return Err(PluginInstallError::Copy(format!("Could not get relative path of {}: {}", path.display(), err.to_string()))),
+        };
+        let destination_path = Path::join(&destination.clone(), &relative_path);
+
+        if path.is_dir() {
+            match fs::create_dir_all(&destination_path) {
+                Err(err) => return Err(PluginInstallError::Copy(format!("Could not destination directory {}: {}", destination_path.display(), err.to_string()))),
+                _ => (),
+            }
+        } else if path.is_file() {
+        debug!("Copy {} to {}", path.display(), destination_path.display());
+            match fs::copy(path, destination_path) {
+                Err(err) => return Err(PluginInstallError::Copy(format!("Could not copy {}: {}", path.display(), err.to_string()))),
+                _ => (),
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn softlink_plugin_directory_to_plugins_folder(source: &PathBuf, destination: &PathBuf) -> Result<(), PluginInstallError> {
+    junction::create(&source, &destination)
+        .map_err(|e| PluginInstallError::IO(format!("Could not create softlink: {}", e).to_string()))
+}
+
+/// Delete the given plugin's folder.
+/// 
+/// If the plugin is in developer mode, we expect the folder to be a junction.
+/// Thus, we only remove the junction.
+/// Otherwise, we completely remove the plugin folder.
+fn delete_plugin_folder(plugin: &Plugin) -> Result<(), PluginManagerError> {
+    match plugin.in_dev_mode {
+        false => {
+            fs::remove_dir_all(&plugin.info.path).map_err(PluginManagerError::Io)
+        },
+        true => {
+            debug!("Remove plugin folder by deleting the junction");
+            junction::delete(&plugin.info.path).map_err(PluginManagerError::Io)?;
+            if plugin.info.path.exists() {
+                fs::remove_dir_all(&plugin.info.path).map_err(PluginManagerError::Io)?;
+            }
+
+            Ok(())
+        },
+    }
 }
 
 /// Sanitizes the given name to be used as a folder name.

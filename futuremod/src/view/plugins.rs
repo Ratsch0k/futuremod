@@ -1,27 +1,46 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, container, row, rule, scrollable, text, Scrollable, Space, Toggler}, Alignment, Command, Length, Padding};
-use iced_aw::{modal, BootstrapIcon};
-use log::{info, warn};
+use iced_aw::{drop_down, modal, BootstrapIcon};
+use log::{debug, info, warn};
 use rfd::FileDialog;
 use futuremod_data::plugin::*;
 
-use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, util::wait_for_ms, widget::{button, icon, icon_with_style, Column, Element, Row}};
+use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, install_plugin_in_developer_mode, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, util::{get_plugin_info_of_local_folder, is_plugin_folder, wait_for_ms}, widget::{button, icon, icon_with_style, Column, Element, Row}};
 use crate::theme::Button;
 
 #[derive(Debug, Clone)]
 pub struct PluginsView {
+  /// Map of all installed plugins.
   plugins: HashMap<String, Plugin>,
+
+  /// The plugin the user currently views.
+  /// If the user is in the plugins overview, this is `None`.
   selected_plugin: Option<String>,
+
+  /// Error message if an error occurred.
+  /// 
+  /// If there is no error message, this is set to `None`.
   error: Option<String>,
+
+  /// Set when the user has to accept an installation.
   confirm_installation: Option<InstallConfirmationPrompt>,
+
+  /// Set if the UI should show a success message that the reload succeeded.
   show_reload_success_message: bool,
+
+
+  /// Whether the plugin installation selection drop down should be expanded.
+  expand_installation_selection: bool,
+
+  /// General configuration of the plugin view.
+  config: PluginsConfig,
 }
 
 #[derive(Debug, Clone)]
 pub enum Plugins {
   Error(String),
-  Loading,
+  Loading(PluginsConfig),
   Loaded(PluginsView)
 }
 
@@ -29,6 +48,7 @@ pub enum Plugins {
 pub struct InstallConfirmationPrompt {
   pub plugin: PluginInfo,
   pub path: PathBuf,
+  pub in_developer_mode: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +64,7 @@ pub enum Message {
   GoToOverview,
   GoBack,
   SelectPluginToInstall,
+  SelectDevPluginToInstall,
   PluginInfoResponse(Result<InstallConfirmationPrompt, String>),
   ConfirmInstallation(InstallConfirmationPrompt),
   CancelInstallation,
@@ -52,20 +73,30 @@ pub enum Message {
   UninstallPlugin(String),
   UninstallPluginResponse(Result<String, String>),
   HideReloadSuccessfulMessage,
+  ChangePluginInstallationSelectionState(bool),
 }
 
+#[derive(Debug, Clone)]
+pub struct PluginsConfig {
+  /// Allow the user to install via symlinks.
+  /// Usually, installation requires a plugin zip which is copied into
+  /// the plugin directory.
+  /// If this is set to `true`, the user additionally has the option to
+  /// install via a symlink.
+  pub allow_symlink_installation: bool,
+}
 
 impl Plugins {
-  pub fn new() -> (Self, Command<Message>) {
+  pub fn new(config: PluginsConfig) -> (Self, Command<Message>) {
     (
-      Plugins::Loading,
+      Plugins::Loading(config),
       Command::perform(get_plugins(), Message::GetPluginsResult)
     )
   }
 
   pub fn update(&mut self, message: Message) -> iced::Command<Message> {
       match self {
-        Plugins::Loading => match message {
+        Plugins::Loading(plugins_config) => match message {
           Message::GetPluginsResult(result) => match result {
               Ok(result) => {
                 *self = Plugins::Loaded(PluginsView{
@@ -73,7 +104,9 @@ impl Plugins {
                   selected_plugin: None, 
                   error: None, 
                   confirm_installation: None, 
-                  show_reload_success_message: false
+                  show_reload_success_message: false,
+                  config: plugins_config.clone(),
+                  expand_installation_selection: false,
                 });
                 Command::none()
               },
@@ -176,6 +209,46 @@ impl Plugins {
               Ok(InstallConfirmationPrompt {
                 plugin: response,
                 path: plugin_package,
+                in_developer_mode: false,
+              })
+            }, Message::PluginInfoResponse)
+          },
+          Message::SelectDevPluginToInstall => {
+            let plugin_package = match FileDialog::new()
+              .set_title("Select the Plugin Directory to install in development mode")
+              .pick_folder() {
+                Some(v) => v,
+                None => return Command::none(),
+            };
+
+            // Close drop down menu
+            plugins_view.expand_installation_selection = false;
+
+            info!("Selected plugin folder at '{}'", plugin_package.display());
+
+            debug!("Check if the selected directory contains a plugin");
+            match is_plugin_folder(&plugin_package) {
+              Ok(false) => {
+                plugins_view.error = Some("The directory does not contain a valid plugin".into());
+                return Command::none();
+              },
+              Err(e) => {
+                plugins_view.error = Some(format!("Could not check the folder: {}", e));
+                
+                return Command::none()
+              },
+              _ => (),
+            };
+
+            info!("Get plugin info of plugin package at '{}'", plugin_package.display());
+
+            Command::perform(async move {
+              let response = get_plugin_info_of_local_folder(&plugin_package).map_err(|e| e.to_string())?;
+
+              Ok(InstallConfirmationPrompt {
+                plugin: response,
+                path: plugin_package,
+                in_developer_mode: true,
               })
             }, Message::PluginInfoResponse)
           },
@@ -192,7 +265,12 @@ impl Plugins {
           Message::ConfirmInstallation(confirmation) => {
             info!("Install plugin package at '{}'", confirmation.path.display());
 
-            Command::perform(install_plugin(confirmation.path).map_err(|e| e.to_string()), Message::InstallResponse)
+            Command::perform(async move {
+              match confirmation.in_developer_mode {
+                false => install_plugin(&confirmation.path).map_err(|e| e.to_string()).await,
+                true => install_plugin_in_developer_mode(&confirmation.path).map_err(|e| e.to_string()).await,
+              }
+            }, Message::InstallResponse)
           },
           Message::CancelInstallation => {
             plugins_view.confirm_installation = None;
@@ -248,6 +326,11 @@ impl Plugins {
             }
 
             Command::none()
+          },
+          Message::ChangePluginInstallationSelectionState(expand) => {
+            plugins_view.expand_installation_selection = expand;
+
+            Command::none()
           }
           _ => Command::none(),
         },
@@ -260,7 +343,7 @@ impl Plugins {
             text(format!("Could not get plugins: {}", e))
             .into()
           },
-          Plugins::Loading => {
+          Plugins::Loading(_) => {
             text("Loading plugins...")
             .into()
           },
@@ -288,7 +371,7 @@ impl Plugins {
                 row![
                   button(icon(iced_aw::BootstrapIcon::ArrowLeft)).style(Button::Text).on_press(Message::GoBack),
                   container(text("Plugins").size(24).vertical_alignment(Vertical::Center)).width(Length::Fill).align_y(Vertical::Center),
-                  button("Install Plugin").on_press(Message::SelectPluginToInstall).style(Button::Primary)
+                  install_button(plugin_view.expand_installation_selection, plugin_view.config.allow_symlink_installation)
                 ]
                   .spacing(16)
                   .align_items(iced::Alignment::Center),
@@ -580,6 +663,32 @@ fn dependencies_list<'a>(dependencies: &Vec<PluginDependency>) -> Element<'a, Me
   }
 
   Column::<'a, Message>::from_vec(list).into()
+}
+
+fn install_button<'a>(expanded: bool, allow_symlink_install: bool) -> Element<'a, Message> {
+  match allow_symlink_install {
+    false => button("Install Plugin").on_press(Message::SelectPluginToInstall).style(Button::Primary).into(),
+    true => drop_down::DropDown::new(
+      button("Install Plugin")
+        .on_press(Message::ChangePluginInstallationSelectionState(true))
+        .style(Button::Primary),
+      container(
+          column![
+          button("Plugin Package").on_press(Message::SelectPluginToInstall).style(Button::Primary).width(Length::Fill),
+          button("Developer Install").on_press(Message::SelectDevPluginToInstall).style(Button::Primary).width(Length::Fill),
+        ]
+          .padding(8.0)
+          .spacing(4.0)
+          .width(Length::Fill)
+      )
+        .style(Container::Dialog),
+      expanded
+    )
+      .on_dismiss(Message::ChangePluginInstallationSelectionState(false))
+      .alignment(drop_down::Alignment::BottomStart)
+      .width(200)
+      .into()
+  }               
 }
 
 async fn enable_plugin(name: String) -> Option<String> {

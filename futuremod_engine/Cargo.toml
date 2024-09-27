@@ -36,6 +36,7 @@ tokio-util = {version = "0.7.10", features = ["io"]}
 toml = "0.8.10"
 walkdir = "2.4.0"
 zip = "0.6.6"
+junction = "1.2.0"
 
 [dependencies.mlua]
 version = "0.9.1"
@@ -53,5 +54,6 @@ features = [
     "Win32_System_Memory",
     "Win32_UI_Input_KeyboardAndMouse",
     "System",
-    "Win32_System_Diagnostics_ToolHelp"
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Storage_FileSystem"
 ]

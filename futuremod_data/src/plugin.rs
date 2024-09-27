@@ -118,7 +118,18 @@ pub struct PluginContext {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Plugin {
+  /// Whether the plugin is enabled or not.
   pub enabled: bool,
+
+  /// The plugin's state.
   pub state: PluginState,
+
+  /// Information about the plugin such as its authors and name.
   pub info: PluginInfo,
+
+  /// Whether the plugin was installed in developer mode.
+  /// 
+  /// For now, the developer mode only means that the plugin
+  /// was installed via a symlink and not a plugin package.
+  pub in_dev_mode: bool,
 }

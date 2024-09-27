@@ -1,7 +1,7 @@
 use iced::{alignment::{Horizontal, Vertical}, widget::{column, container, text}, Alignment, Command, Length};
 use log::debug;
 
-use crate::{config::get_config, log_subscriber::{self, LogRecord}, theme::{Button, Theme, self}, widget::{button, Element}};
+use crate::{config::get_config, log_subscriber::{self, LogRecord}, theme::{self, Button, Theme}, view::plugins::PluginsConfig, widget::{button, Element}};
 
 use super::{logs, plugins};
 
@@ -98,7 +98,9 @@ impl Main {
             },
             None => match message {
                 Message::ToPlugins => {
-                    let (view, message) = plugins::Plugins::new();
+                    let (view, message) = plugins::Plugins::new(PluginsConfig{
+                        allow_symlink_installation: self.is_developer,
+                    });
 
                     self.view = Some(View::Plugins(view));
                     message.map(Message::Plugins)
