@@ -1,4 +1,4 @@
-use iced::{color, theme::palette::{Pair, Primary, Secondary, Success}, Color};
+use iced::{color, theme::palette::{Pair, Primary, Secondary}, Color};
 
 
 pub const BACKGROUND: Color = color!(0x13111F);
@@ -25,7 +25,7 @@ pub struct Palette {
   pub background: ColorRange,
   pub primary: Primary,
   pub secondary: Secondary,
-  pub success: Success,
+  pub success: ColorRange,
   pub warning: ColorRange,
   pub danger: ColorRange,
   pub is_dark: bool,
@@ -58,7 +58,13 @@ impl Default for Palette {
         },
         primary: Primary::generate(color!(0x4926A1), BACKGROUND, color!(0xffffff)),
         secondary: Secondary::generate(color!(0x13111F), color!(0xffffff)),
-        success: Success::generate(color!(0x9AFF75), BACKGROUND, color!(0xffffff)),
+        success: ColorRange {
+            lightest: Pair { color: color!(0xCDFFBA), text: color!(0x000000) },
+            light: Pair { color: color!(0xB7FF9D), text: color!(0x000000) },
+            medium: Pair { color: color!(0x9AFF75), text: color!(0xffffff) },
+            dark: Pair { color: color!(0x155000), text: color!(0xffffff) },
+            darkest: Pair { color: color!(0x0E3500), text: color!(0xffffff) },
+        },
         danger: ColorRange {
             lightest: Pair { color: color!(0xF3D1D1), text: color!(0x000000) },
             light: Pair { color: color!(0xD35656), text: color!(0x000000) },
@@ -102,7 +108,7 @@ impl Palette {
     iced::theme::Palette {
       background: self.background.darkest.color,
       primary: self.primary.base.color,
-      success: self.success.base.color,
+      success: self.success.medium.color,
       danger: self.danger.medium.color,
       text: self.background.darkest.text,
     }

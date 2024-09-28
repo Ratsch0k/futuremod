@@ -1,12 +1,12 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use iced::{alignment::Vertical, futures::TryFutureExt, widget::{column, container, row, rule, scrollable, text, Scrollable, Space, Toggler}, Alignment, Command, Length, Padding};
-use iced_aw::{drop_down, modal, BootstrapIcon};
+use iced_aw::{drop_down, modal, Badge, BootstrapIcon};
 use log::{debug, info, warn};
 use rfd::FileDialog;
 use futuremod_data::plugin::*;
 
-use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, install_plugin_in_developer_mode, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, util::{get_plugin_info_of_local_folder, is_plugin_folder, wait_for_ms}, widget::{button, icon, icon_with_style, Column, Element, Row}};
+use crate::{api::{build_url, get_plugin_info, get_plugins, install_plugin, install_plugin_in_developer_mode, reload_plugin, uninstall_plugin}, theme::{self, Container, Text, Theme}, util::{get_plugin_info_of_local_folder, is_plugin_folder, wait_for_ms}, widget::{bold, button, icon, icon_with_style, Column, Element, Row}};
 use crate::theme::Button;
 
 #[derive(Debug, Clone)]
@@ -473,13 +473,31 @@ impl Plugins {
   }
 }
 
+fn plugin_card_description<'a>(plugin: &Plugin) -> Element<'a, Message> {
+  let dev_mode_badge: Option<Element<'a, Message>> = match &plugin.in_dev_mode {
+    false => None,
+    true => Some(Badge::new(text("Developer Mode").font(bold()).size(12))
+      .style(theme::BadgeStyles::Success)
+      .padding(4)
+      .into()),
+  };
+
+  Row::new()
+    .push(plugin_state_component(plugin))
+    .push_maybe(dev_mode_badge)
+    .align_items(Alignment::Center)
+    .spacing(4.0)
+    .into()
+}
+
 fn plugin_card<'a>(name: &String, plugin: &Plugin) -> Element<'a, Message> {
   container(
     row![
       Column::new()
         .push(text(name).size(20))
-        .push(plugin_state_component(plugin))
-        .width(Length::Fill),
+        .push(plugin_card_description(&plugin))
+        .width(Length::Fill)
+        .spacing(8.0),
       Row::new()
       .push(plugin_go_to_details_button(plugin))
       .push_maybe(plugin_toggle_button(plugin))
@@ -507,7 +525,7 @@ fn plugin_state_component<'a>(plugin: &Plugin) -> Element<'a, Message> {
   };
 
   text(message)
-    .size(12)
+    .size(14)
     .into()
 }
 

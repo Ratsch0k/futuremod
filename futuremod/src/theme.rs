@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
 use iced::{advanced::widget::text, application::StyleSheet, border::Radius, color, overlay::menu, theme::{self, palette::Pair, Checkbox, Menu, PickList, Toggler}, widget::{button, checkbox, container, pick_list, rule, scrollable, toggler}, Background, Border, Color, Shadow, Vector};
-use iced_aw::{style::{card, modal, MenuBarStyle}, CardStyles, ModalStyles};
+use iced_aw::{badge, style::{card, modal, MenuBarStyle}, CardStyles, ModalStyles};
 
-use crate::{palette::ColorRange, util};
+use crate::{palette::ColorRange, util::{self, lighten}};
 
 
 /// Custom theme based on a default theme.
@@ -74,7 +74,7 @@ impl button::StyleSheet for Theme {
     match style {
         Button::Primary => from_pair(self.palette.primary.strong),
         Button::Secondary => from_pair(self.palette.secondary.base),
-        Button::Positive => from_pair(self.palette.success.base),
+        Button::Positive => from_pair(self.palette.success.medium),
         Button::Destructive => from_pair(self.palette.danger.medium),
         Button::Text => button::Appearance {
             text_color: self.palette.background.darkest.text,
@@ -95,7 +95,7 @@ fn hovered(&self, style: &Self::Style) -> button::Appearance {
     let background = match style {
         Button::Primary => Some(self.palette.primary.base.color),
         Button::Secondary => Some(self.palette.secondary.base.color),
-        Button::Positive => Some(self.palette.success.strong.color),
+        Button::Positive => Some(self.palette.success.dark.color),
         Button::Destructive => Some(self.palette.danger.dark.color),
         Button::Default => Some(self.palette.background.light.color),
         Button::Text  => Some(util::alpha(color!(0xffffff), 0.01)),
@@ -362,4 +362,35 @@ impl toggler::StyleSheet for Theme {
     fn hovered(&self, style: &Self::Style, is_active: bool) -> toggler::Appearance {
         self.theme.hovered(style, is_active)
     }
+}
+
+
+#[derive(Default)]
+pub enum BadgeStyles {
+  #[default]
+  Default,
+  Success,
+  DefaultStyle(iced_aw::BadgeStyles),
+}
+
+impl badge::StyleSheet for Theme {
+  type Style = BadgeStyles;
+  
+  fn active(&self, style: &Self::Style) -> badge::Appearance {
+    let from_pair = |color: &Pair| badge::Appearance {
+      background: color.color.into(),
+      border_radius: Some(8.0),
+      border_width: 1.0,
+      border_color: Some(lighten(color.color, 0.1)),
+      text_color: color.text,
+    };
+
+    match style {
+      BadgeStyles::DefaultStyle(default_style) => {
+        self.theme.active(default_style)
+      },
+      BadgeStyles::Default => from_pair(&self.palette.background.dark),
+      BadgeStyles::Success => from_pair(&self.palette.success.dark),
+    }
+  }  
 }
