@@ -370,6 +370,7 @@ pub enum BadgeStyles {
   #[default]
   Default,
   Success,
+  Warning,
   DefaultStyle(iced_aw::BadgeStyles),
 }
 
@@ -391,6 +392,7 @@ impl badge::StyleSheet for Theme {
       },
       BadgeStyles::Default => from_pair(&self.palette.background.dark),
       BadgeStyles::Success => from_pair(&self.palette.success.dark),
+      BadgeStyles::Warning => from_pair(&self.palette.warning.medium),
     }
   }  
 }

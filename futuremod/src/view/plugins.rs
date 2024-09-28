@@ -477,7 +477,7 @@ fn plugin_card_description<'a>(plugin: &Plugin) -> Element<'a, Message> {
   let dev_mode_badge: Option<Element<'a, Message>> = match &plugin.in_dev_mode {
     false => None,
     true => Some(Badge::new(text("Developer Mode").font(bold()).size(12))
-      .style(theme::BadgeStyles::Success)
+      .style(theme::BadgeStyles::Warning)
       .padding(4)
       .into()),
   };

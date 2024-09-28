@@ -161,7 +161,6 @@ fn get_title(is_developer: bool) -> Element<'static, Message> {
     match is_developer {
         true => text("FutureCop Mod - Developer")
             .size(48)
-            .style(theme::Text::Warn)
             .into(),
         false => text("FutureCop Mod")
             .size(48)
