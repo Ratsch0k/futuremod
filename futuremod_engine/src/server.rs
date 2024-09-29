@@ -49,6 +49,7 @@ fn serve(config: Config) -> Result<(), Error> {
                 .route("/plugin/disable", put(disable_plugin))
                 .route("/plugin/reload", put(reload_plugin))
                 .route("/plugin/install", post(install_plugin))
+                .route("/plugin/install-dev", post(install_plugin_in_dev_mode))
                 .route("/plugin/uninstall", post(uninstall_plugin))
                 .route("/plugin/info", put(get_plugin_info))
                 .route("/log", get(log_handler));
@@ -331,7 +332,7 @@ async fn get_plugin_info(request: BodyStream) -> (StatusCode, Result<Json<Plugin
     };
 
     info!("Reading plugin information");
-    let info = match load_plugin_info(temporary_plugin_folder.clone()) {
+    let info = match load_plugin_info(&temporary_plugin_folder) {
         Err(err) => match err {
             PluginInfoError::FileNotFound => return (StatusCode::BAD_REQUEST, Err("Plugin package doesn't contain a info file".to_string())),
             PluginInfoError::Format(msg) => return (StatusCode::BAD_REQUEST, Err(format!("Plugin info file has invalid format: {}", msg))),
@@ -383,7 +384,7 @@ async fn install_plugin(request: BodyStream) -> (StatusCode, Result<(), String>)
     };
 
     info!("Reading plugin information");
-    let info = match load_plugin_info(temporary_plugin_folder.clone()) {
+    let info = match load_plugin_info(&temporary_plugin_folder) {
         Err(err) => match err {
             PluginInfoError::FileNotFound => return (StatusCode::BAD_REQUEST, Err("Plugin package doesn't contain a info file".to_string())),
             PluginInfoError::Format(msg) => return (StatusCode::BAD_REQUEST, Err(format!("Plugin info file has invalid format: {}", msg))),
@@ -458,6 +459,25 @@ async fn uninstall_plugin(Json(payload): Json<PluginByName>) -> impl IntoRespons
             Err(e) => match e {
                 PluginManagerError::PluginNotFound => return (StatusCode::NOT_FOUND, "plugin not found").into_response(),
                 _ => return (StatusCode::INTERNAL_SERVER_ERROR, format!("unexpected error: {:?}", e )).into_response(),
+            },
+            Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        }
+    })
+}
+
+#[derive(Deserialize)]
+struct PluginPath {
+    path: String,
+}
+
+async fn install_plugin_in_dev_mode(Json(payload): Json<PluginPath>) -> impl IntoResponse {
+    let path_buf = PathBuf::from(payload.path);
+
+    with_plugin_manager_mut(|plugin_manager: &mut PluginManager| {
+        match plugin_manager.install_plugin_in_dev_mode(&path_buf) {
+            Err(e) => match e {
+                PluginInstallError::InvalidPluginFolder => return (StatusCode::BAD_REQUEST, "folder does not contain a plugin").into_response(),
+                _ => return (StatusCode::INTERNAL_SERVER_ERROR, format!("unexpected error: {:?}", e)).into_response(),
             },
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
         }

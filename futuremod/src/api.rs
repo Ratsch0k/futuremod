@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::config::get_config;
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use log::info;
 use reqwest::Body;
 use serde::de::DeserializeOwned;
@@ -54,7 +54,7 @@ pub async fn reload_plugin(name: &str) -> Result<(), anyhow::Error> {
   }  
 }
 
-pub async fn install_plugin(path: PathBuf) -> Result<(), anyhow::Error> {
+pub async fn install_plugin(path: &PathBuf) -> Result<(), anyhow::Error> {
   let file = fs::File::open(path.clone()).await.map_err(|e| anyhow!("Could not open file: {}", e.to_string()))?;
 
   let stream = FramedRead::new(file, BytesCodec::new());
@@ -74,6 +74,30 @@ pub async fn install_plugin(path: PathBuf) -> Result<(), anyhow::Error> {
     };
 
     return Err(anyhow!("Could not install plugin '{}': {}", path.display(), err));
+  }
+
+  Ok(())
+}
+
+pub async fn install_plugin_in_developer_mode(path: &PathBuf) -> Result<(), anyhow::Error> {
+  let mut body = HashMap::new();
+  let path_str = path.to_str().ok_or(anyhow!("Could not convert folder path to string"))?;
+  body.insert("path", path_str);
+
+  let response = reqwest::Client::new()
+    .post(build_url("/plugin/install-dev"))
+    .json(&body)
+    .send()
+    .await
+    .map_err(|e| anyhow!("Could not install plugin: {}", e))?;
+
+  if !response.status().is_success() {
+    let e = match response.text().await {
+      Ok(e) => e,
+      Err(e) => e.to_string(),
+    };
+
+    bail!("Could not install plugin: {}", e);
   }
 
   Ok(())

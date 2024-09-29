@@ -28,6 +28,8 @@ pub struct Plugin {
     /// Plugin information such as the description and authors.
     pub info: PluginInfo,
 
+    pub in_dev_mode: bool,
+
     /// Reference to lua.
     #[serde(skip)]
     lua: Arc<Lua>,
@@ -39,6 +41,7 @@ impl Into<futuremod_data::plugin::Plugin> for Plugin {
             enabled: self.enabled,
             state: self.state.into(),
             info: self.info.into(),
+            in_dev_mode: self.in_dev_mode,
         }
     }
 }
@@ -127,8 +130,8 @@ impl Plugin {
     /// into memory.
     /// 
     /// To load the plugin into memory use [`Plugin::load`].
-    pub fn new(lua: Arc<Lua>, info: PluginInfo) -> Self {
-        Plugin { info, state: PluginState::Unloaded, enabled: false, lua: lua.clone() }
+    pub fn new(lua: Arc<Lua>, info: PluginInfo, in_dev_mode: bool) -> Self {
+        Plugin { info, state: PluginState::Unloaded, enabled: false, lua: lua.clone(), in_dev_mode }
     }
 
     fn set_error(&mut self, e: PluginError) -> PluginError {

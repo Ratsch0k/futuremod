@@ -1,5 +1,6 @@
 use std::{io, str::FromStr, time::SystemTime};
 use fern::colors::{ColoredLevelConfig, Color};
+use gui::Flags;
 use log::*;
 use clap::Parser;
 use clap::builder::TypedValueParser as _;
@@ -30,6 +31,9 @@ struct Cli {
 
     #[arg(short, long, default_value_t = String::from("config.json"))]
     config: String,
+
+    #[arg(long, default_value_t = false, help = "Enable developer mode")]
+    developer: bool,
 }
 
 fn main() -> iced::Result {
@@ -70,14 +74,21 @@ fn main() -> iced::Result {
         Ok(_) => (),
         Err(e) => panic!("{}", e)
     }
-    
-    info!("Starting application");
+
+    if args.developer {
+        info!("Starting application in developer mode")
+    } else {
+        info!("Starting application");
+    }
 
     gui::ModInjector::run(
         Settings {
             window: window::Settings {
                 size: Size::new(1024.0, 800.0),
                 ..window::Settings::default()
+            },
+            flags: Flags {
+                is_developer: args.developer,
             },
             ..Settings::default()
         }
