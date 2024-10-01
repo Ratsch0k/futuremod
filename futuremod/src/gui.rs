@@ -2,9 +2,10 @@ use iced::{executor, font, Application, Command, Subscription};
 use log::debug;
 
 use crate::palette::Palette;
+use crate::view::dashboard;
 use crate::{theme, widget::Element};
 
-use super::view::{main, loading};
+use super::view::loading;
 
 #[derive(Debug)]
 pub struct Flags {
@@ -22,7 +23,7 @@ impl Default for Flags {
 /// The state contains some global information as well as
 /// the current view.
 #[derive(Debug)]
-pub struct ModInjector {
+pub struct ModInjector{
     /// Wether the GUI is in developer mode
     is_developer: bool,
 
@@ -33,14 +34,14 @@ pub struct ModInjector {
 #[derive(Debug)]
 pub enum View {
     Loading(loading::Loading),
-    Main(main::Main),
+    Dashboard(dashboard::Dashboard),
 }
 
 #[derive(Debug)]
 pub enum Message {
     Loading(loading::Message),
     FontLoaded(Result<(), font::Error>),
-    Main(main::Message),
+    Dashboard(dashboard::Message),
 }
 
 
@@ -83,9 +84,8 @@ impl Application for ModInjector {
 
         match &mut self.current_view {
             View::Loading(loading) => {
-                if let Message::Loading(loading::Message::IsModActive(true)) = message {
-                    let main = main::Main::new(self.is_developer);
-                    self.current_view = View::Main(main);
+                if let Message::Loading(loading::Message::GotPlugins(plugins)) = message {
+                    self.current_view = View::Dashboard(dashboard::Dashboard::new(plugins, self.is_developer));
                     return Command::none()
                 }
 
@@ -95,9 +95,9 @@ impl Application for ModInjector {
 
                 Command::none()
             },
-            View::Main(main) => match message {
-                Message::Main(message) => {
-                    main.update(message).map(Message::Main)
+            View::Dashboard(dashboard) => match message {
+                Message::Dashboard(message) => {
+                    dashboard.update(message).map(Message::Dashboard)
                 },
                 _ => Command::none(),
             },
@@ -107,13 +107,13 @@ impl Application for ModInjector {
     fn view(&self) -> Element<'_, Self::Message> {
         match &self.current_view {
             View::Loading(loading) => loading.view().map(Message::Loading),
-            View::Main(main) => main.view().map(Message::Main),
+            View::Dashboard(main) => main.view().map(Message::Dashboard),
         }
     }
 
     fn subscription(&self) -> iced::Subscription<Self::Message> {
         match &self.current_view {
-            View::Main(main) => main.subscription().map(Message::Main),
+            View::Dashboard(main) => main.subscription().map(Message::Dashboard),
             _ => Subscription::none(),
         }
     }

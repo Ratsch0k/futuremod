@@ -3,18 +3,15 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use futuremod_data::plugin::Plugin;
 use iced::{alignment::{Horizontal, Vertical}, widget::{checkbox, column, container, row, scrollable::{Alignment, Direction, Properties, Scrollable}, text}, Command, Length, Renderer};
-use iced_aw::{menu::{Item, Menu}, menu_bar, menu_items, BootstrapIcon};
+use iced_aw::{menu::{Item, Menu}, menu_bar, menu_items};
 
-use crate::{api::get_plugins, theme::{Button, Theme}, widget::bold};
-use crate::{log_subscriber::LogRecord, theme, view::main::LogState, widget::{button, icon, Element}};
-
-use super::main;
+use crate::{api::get_plugins, logs::{self, state::LogState, subscriber::LogRecord}, theme::{Button, Theme}, widget::bold};
+use crate::{theme, widget::{button, Element}};
 
 const MAX_HISTORY: isize = 250;
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    GoBack,
     ToggleHistory(bool),
     ToggleLevelDebug(bool),
     ToggleLevelInfo(bool),
@@ -89,7 +86,7 @@ impl Logs {
     )
   }
 
-  pub fn view<'a>(&self, log: &'a main::Logs) -> Element<'a, Message> {
+  pub fn view<'a>(&self, log: &'a logs::state::Logs) -> Element<'a, Message> {
     match self {
       Logs::Loading => {
         container(text("Loading..."))
@@ -266,13 +263,11 @@ impl Logs {
 
 fn header<'a>(unlimited_history: bool, selected_levels: &SelectedLogLevels, plugins: &HashMap<String, Plugin>, selected_origins: &HashMap<LogOrigin, bool>) -> Element<'a, Message> {
     row![
-        button(icon(BootstrapIcon::ArrowLeft)).style(Button::Text)
-            .on_press(Message::GoBack),
         container(text("Logs").size(24)).width(Length::Fill),
         origin_picker(plugins, selected_origins),
         level_picker(&selected_levels),
         checkbox("Unlimited history", unlimited_history).on_toggle(Message::ToggleHistory),
-    ].spacing(16).padding([4.0, 16.0]).align_items(iced::Alignment::Center)
+    ].spacing(16).padding(16.0).align_items(iced::Alignment::Center)
     .into()
 }
 

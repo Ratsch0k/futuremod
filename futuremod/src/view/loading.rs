@@ -1,4 +1,5 @@
-use std::{path::{Path, PathBuf}, time::{Duration, SystemTime}};
+use std::{collections::HashMap, path::{Path, PathBuf}, time::{Duration, SystemTime}};
+use futuremod_data::plugin::Plugin;
 use iced::{widget::{column, container, row, text, Column}, Alignment, Command, Length, Padding};
 use log::*;
 use rfd::FileDialog;
@@ -23,6 +24,8 @@ pub enum Loading {
   /// This variant keeps track of the time when the mod was injected in this injection
   /// attempt and how many attempts were already made.
   WaitingForMod{since: SystemTime, injection_attempts: u8, mod_path: PathBuf},
+  FetchingPlugins,
+  FetchingPluginError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +33,8 @@ pub enum Message {
   OpenPathSelection,
   CheckIfStarted,
   IsModActive(bool),
+  PluginResponse(Result<HashMap<String, Plugin>, String>),
+  GotPlugins(HashMap<String, Plugin>)
 }
 
 impl Loading {
@@ -78,6 +83,12 @@ impl Loading {
           button("SELECT")
             .on_press(Message::OpenPathSelection),
         ].into()
+      },
+      Loading::FetchingPlugins => {
+        column![text("Fetching plugins")].into()
+      },
+      Loading::FetchingPluginError(e) => {
+        column![text(format!("Error while fetching plugins: {}", e))].into()
       }
     };
 
@@ -116,7 +127,9 @@ impl Loading {
       Loading::WaitingForMod{since, injection_attempts: injection_tries, mod_path} => match msg {
         Message::IsModActive(is_active) => match is_active {
           true => {
-            error!("Loading view should never receive Message::IsModActive(true)")
+            *self = Loading::FetchingPlugins;
+
+            return Command::perform(async {api::get_plugins().await.map_err(|e| e.to_string())}, Message::PluginResponse);
           },
           false => {
             // Check how much time has passed since waiting for the mod
@@ -155,7 +168,19 @@ impl Loading {
       Loading::NoPath => match msg {
         Message::OpenPathSelection => return self.pick_mod_path(),
         _ => (),
-      }
+      },
+      Loading::FetchingPlugins => match msg {
+        Message::PluginResponse(response) => match response {
+          Ok(plugins) => {
+            return Command::perform(async {plugins}, Message::GotPlugins);
+          },
+          Err(e) => {
+            *self = Loading::FetchingPluginError(e);
+          }
+        },
+        _ => (),
+      },
+      _ => (),
     }
 
     Command::none()

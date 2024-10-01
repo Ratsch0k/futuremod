@@ -11,11 +11,11 @@ mod config;
 mod view;
 mod api;
 mod injector;
-mod log_subscriber;
 mod theme;
 mod widget;
 mod util;
 mod palette;
+mod logs;
 
 
 #[derive(Parser)]

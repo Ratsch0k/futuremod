@@ -69,6 +69,7 @@ pub fn alpha(a: Color, alpha: f32) -> Color {
 }
 
 /// Waits for the given duration of milliseconds.
+#[allow(unused)]
 pub async fn wait_for_ms(duration: u64) {
     tokio::time::sleep(Duration::from_millis(duration)).await
 }

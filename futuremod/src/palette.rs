@@ -52,7 +52,7 @@ impl Default for Palette {
             text: color!(0xFAFAFA),
           },
           darkest: Pair {
-            color: color!(0x0C0A0C),
+            color: color!(0x0A0A0A),
             text: color!(0xFAFAFA),
           },
         },

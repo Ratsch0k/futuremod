@@ -47,6 +47,7 @@ pub enum Button {
   Positive,
   Destructive,
   Text,
+  HoverHighlight,
   Custom(Box<dyn button::StyleSheet<Style = Theme>>),
 }
 
@@ -76,74 +77,83 @@ impl button::StyleSheet for Theme {
         Button::Secondary => from_pair(self.palette.secondary.base),
         Button::Positive => from_pair(self.palette.success.medium),
         Button::Destructive => from_pair(self.palette.danger.medium),
-        Button::Text => button::Appearance {
+        Button::Text | Button::HoverHighlight => button::Appearance {
             text_color: self.palette.background.darkest.text,
             ..appearance
         },
         Button::Default => from_color_range(&self.palette.background),
         Button::Custom(custom) => custom.active(self),
     }
-}
+  }
 
-fn hovered(&self, style: &Self::Style) -> button::Appearance {
+  fn hovered(&self, style: &Self::Style) -> button::Appearance {
+      if let Button::Custom(custom) = style {
+          return custom.hovered(self);
+      }
+
+      let active = self.active(style);
+
+      let background = match style {
+          Button::Primary => Some(self.palette.primary.base.color),
+          Button::Secondary => Some(self.palette.secondary.base.color),
+          Button::Positive => Some(self.palette.success.dark.color),
+          Button::Destructive => Some(self.palette.danger.dark.color),
+          Button::Default => Some(self.palette.background.light.color),
+          Button::Text  => Some(util::alpha(color!(0xffffff), 0.01)),
+          Button::HoverHighlight => Some(self.palette.primary.strong.color),
+          Button::Custom(_) => None,
+      };
+
+      button::Appearance {
+          background: background.map(Background::from),
+          ..active
+      }
+  }
+
+  fn pressed(&self, style: &Self::Style) -> button::Appearance {
     if let Button::Custom(custom) = style {
-        return custom.hovered(self);
+        return custom.pressed(self);
     }
 
     let active = self.active(style);
 
     let background = match style {
-        Button::Primary => Some(self.palette.primary.base.color),
-        Button::Secondary => Some(self.palette.secondary.base.color),
-        Button::Positive => Some(self.palette.success.dark.color),
-        Button::Destructive => Some(self.palette.danger.dark.color),
-        Button::Default => Some(self.palette.background.light.color),
-        Button::Text  => Some(util::alpha(color!(0xffffff), 0.01)),
-        Button::Custom(_) => None,
+      Button::HoverHighlight => Some(Background::from(self.palette.primary.base.color)),
+      _ => active.background,
     };
 
     button::Appearance {
-        background: background.map(Background::from),
+        shadow_offset: Vector::default(),
+        background,
         ..active
     }
-}
+  }
 
-fn pressed(&self, style: &Self::Style) -> button::Appearance {
-    if let Button::Custom(custom) = style {
-        return custom.pressed(self);
-    }
+  fn disabled(&self, style: &Self::Style) -> button::Appearance {
+      if let Button::Custom(custom) = style {
+          return custom.disabled(self);
+      }
 
-    button::Appearance {
-        shadow_offset: Vector::default(),
-        ..self.active(style)
-    }
-}
+      let active = self.active(style);
 
-fn disabled(&self, style: &Self::Style) -> button::Appearance {
-    if let Button::Custom(custom) = style {
-        return custom.disabled(self);
-    }
-
-    let active = self.active(style);
-
-    button::Appearance {
-        shadow_offset: Vector::default(),
-        background: active.background.map(|background| match background {
-            Background::Color(color) => Background::Color(Color {
-                a: color.a * 0.5,
-                ..color
-            }),
-            Background::Gradient(gradient) => {
-                Background::Gradient(gradient.mul_alpha(0.5))
-            }
-        }),
-        text_color: Color {
-            a: active.text_color.a * 0.5,
-            ..active.text_color
-        },
-        ..active
-    }
-}
+      button::Appearance {
+          shadow_offset: Vector::default(),
+          background: active.background.map(|background| match background {
+              Background::Color(color) => Background::Color(Color {
+                  a: color.a * 0.5,
+                  ..color
+              }),
+              Background::Gradient(gradient) => {
+                  Background::Gradient(gradient.mul_alpha(0.5))
+              }
+          }),
+          text_color: Color {
+              a: active.text_color.a * 0.5,
+              ..active.text_color
+          },
+          ..active
+      }
+  }
 }
 
 /// Container Styles
