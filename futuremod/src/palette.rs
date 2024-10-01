@@ -1,7 +1,7 @@
 use iced::{color, theme::palette::{Pair, Primary, Secondary}, Color};
 
 
-pub const BACKGROUND: Color = color!(0x0C0A0C);
+pub const BACKGROUND: Color = color!(0x161517);
 
 /// Color range.
 /// 
@@ -36,27 +36,27 @@ impl Default for Palette {
       Palette {
         background: ColorRange {
           lightest: Pair {
-            color: color!(0x574957),
-            text: color!(0x151515),
+            color: color!(0x3D3A40),
+            text: color!(0xFAFAFA),
           },
           light: Pair {
-            color: color!(0x443944),
-            text: color!(0x151515),
+            color: color!(0x363339),
+            text: color!(0xFAFAFA),
           },
           medium: Pair {
-            color: color!(0x312931),
+            color: color!(0x2B292D),
             text: color!(0xFAFAFA),
           },
           dark: Pair {
-            color: color!(0x1E191E),
+            color: color!(0x1F1E20),
             text: color!(0xFAFAFA),
           },
           darkest: Pair {
-            color: color!(0x0A0A0A),
+            color: color!(0x161517),
             text: color!(0xFAFAFA),
           },
         },
-        primary: Primary::generate(color!(0x9A47FF), BACKGROUND, color!(0xffffff)),
+        primary: Primary::generate(color!(0x9A47FF), BACKGROUND, color!(0xFAFAFA)),
         secondary: Secondary::generate(color!(0x13111F), color!(0xffffff)),
         success: ColorRange {
             lightest: Pair { color: color!(0xCDFFBA), text: color!(0x000000) },
