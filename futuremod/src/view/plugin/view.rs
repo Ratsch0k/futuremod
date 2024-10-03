@@ -16,7 +16,7 @@ pub enum Message {
   Enable(String),
   Disable(String),
   Reload(String),
-  Uninstall(String),
+  UninstallPrompt(String),
 }
 
 impl Plugin {

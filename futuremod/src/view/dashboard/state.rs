@@ -2,7 +2,7 @@ use iced::Command;
 use log::{debug, info, warn};
 use rfd::FileDialog;
 
-use crate::{api::{self, get_plugins, reload_plugin}, util::{get_plugin_info_of_local_folder, is_plugin_folder}, view::{self, dashboard::view::InstallConfirmationPrompt, logs}};
+use crate::{api::{self, get_plugins, reload_plugin}, util::{get_plugin_info_of_local_folder, is_plugin_folder}, view::{self, dashboard::view::{Dialog, InstallConfirmationPrompt}, logs}};
 
 use super::{view::View, Dashboard, Message};
 
@@ -31,6 +31,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
           return Command::perform(api::get_plugins(), Message::GetPluginsResponse);
         },
         Err(e) => {
+          dashboard.dialog = Some(Dialog::Error(format!("Could not enable the plugin: {}", e).to_string()));
           warn!("Could not enable plugin: {}", e);
         }
       }
@@ -41,6 +42,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
           return Command::perform(api::get_plugins(), Message::GetPluginsResponse);
         },
         Err(e) => {
+          dashboard.dialog = Some(Dialog::Error(format!("Could not disable the plugin: {}", e).to_string()));
           warn!("Could not disable plugin: {}", e);
         }
       }
@@ -55,7 +57,10 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
         }
       }
     },
-    Message::Uninstall(name) | Message::Plugin(view::plugin::Message::Uninstall(name)) => {
+    Message::UninstallPrompt(plugin_name) | Message::Plugin(view::plugin::Message::UninstallPrompt(plugin_name)) => {
+      dashboard.dialog = Some(Dialog::UninstallPrompt(plugin_name));
+    },
+    Message::Uninstall(name) => {
       return Command::perform(async move {api::uninstall_plugin(name).await.map_err(|e| e.to_string())}, Message::UninstallResponse);
     },
     Message::UninstallResponse(response) => {
@@ -63,11 +68,12 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
         Ok(()) => {
           // Navigate back to plugin list
           dashboard.view = None;
+          dashboard.dialog = None;
           return Command::perform(get_plugins(), Message::GetPluginsResponse)
         },
         Err(e) => {
-          // TODO: Display error to user
           warn!("Could not uninstall error: {}", e);
+          dashboard.dialog = Some(Dialog::Error(format!("Could not uninstall the plugin: {}", e).to_string()));
         }
       }
     },
@@ -78,8 +84,8 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
       match response {
         Ok(()) => return Command::perform(get_plugins(), Message::GetPluginsResponse),
         Err(e) => {
-          // TODO: Display error message to user
           warn!("Could not reload plugin: {}", e);
+          dashboard.dialog = Some(Dialog::Error(format!("Could not reload the plugin: {}", e).to_string()));
         },
       }
     }
@@ -146,16 +152,13 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
     Message::OpenInstallConfirmationPromptDialog(prompt_response) => {
       match prompt_response {
         Ok(prompt) => {
-          dashboard.installation_prompt = Some(prompt);
+          dashboard.dialog = Some(Dialog::InstallationPrompt(prompt));
         },
         Err(e) => {
-          // TODO: Show error to user
           warn!("Could not fetch plugin information: {}", e);
+          dashboard.dialog = Some(Dialog::Error(format!("Could not fetch plugin information: {}", e).to_string()));
         },
       }
-    },
-    Message::CloseInstallConfirmationPromptDialog => {
-      dashboard.installation_prompt = None;
     },
     Message::ConfirmInstallation(confirmed_prompt) => {
       info!("Install plugin package at '{}'", confirmed_prompt.path.display());
@@ -168,18 +171,23 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
       }, Message::InstallResponse);
     },
     Message::InstallResponse(response) => {
-      dashboard.installation_prompt = None;
-
       match response {
         Ok(()) => {
-          return Command::perform(async {get_plugins().await.map_err(|e| e.to_string())}, Message::GetPluginsResponse);
+          return Command::perform(async {get_plugins().await.map_err(|e| e.to_string())}, Message::InstallGetPlugins);
         },
         Err(e) => {
-          // TODO: Show error to user
           warn!("Could not install plugin: {}", e);
+          dashboard.dialog = Some(Dialog::Error(format!("Could not install plugin: {}", e).to_string()));
         }
       }
-    }
+    },
+    Message::InstallGetPlugins(response) => {
+      dashboard.dialog = None;
+      return Command::perform(async {}, |_| Message::GetPluginsResponse(response));
+    },
+    Message::CloseDialog => {
+      dashboard.dialog = None;
+    },
     // Message decision tree based on view state
     message => match &mut dashboard.view {
       Some(view) => match view {

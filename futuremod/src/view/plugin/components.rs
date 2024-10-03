@@ -2,12 +2,12 @@ use futuremod_data::plugin::{Plugin, PluginDependency, PluginState};
 use iced::{widget::{column, container, row, rule, text, Scrollable, Toggler}, Alignment, Length};
 use iced_aw::BootstrapIcon;
 
-use crate::{theme::{self, Button}, widget::{button, icon, Column, Element, Row}};
+use crate::{theme::{self, Button}, widget::{button, icon, icon_text_button, icon_text_button_advanced, Column, Element, IconTextButtonOptions, Row}};
 
 use super::Message;
 
 fn plugin_reload_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
-  button(text("Reload"))
+  icon_text_button(BootstrapIcon::ArrowClockwise ,"Reload")
     .on_press(Message::Reload(plugin.info.name.clone()))
     .style(Button::Primary)
     .into()
@@ -30,8 +30,8 @@ fn plugin_details_state<'a>(plugin: &Plugin) -> Element<'a, Message> {
 }
 
 fn plugin_uninstall_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
-  button(text("Uninstall"))
-  .on_press(Message::Uninstall(plugin.info.name.clone()))
+  icon_text_button_advanced(BootstrapIcon::X,"Uninstall", IconTextButtonOptions::default().with_icon_size(24)).padding([3.0, 16.0, 3.0, 8.0])
+  .on_press(Message::UninstallPrompt(plugin.info.name.clone()))
   .style(Button::Destructive)
   .into()
 }

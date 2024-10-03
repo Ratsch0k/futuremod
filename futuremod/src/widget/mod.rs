@@ -1,6 +1,6 @@
 /// Big inspiration for custom theming was from: https://github.com/squidowl/halloy and https://github.com/B0ney/xmodits
 mod button;
-pub use button::{button, hover_button};
+pub use button::*;
 
 mod icon;
 pub use icon::*;

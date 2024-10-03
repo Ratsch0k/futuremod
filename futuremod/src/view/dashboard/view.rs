@@ -21,7 +21,14 @@ pub struct Dashboard {
   pub(super) plugins: HashMap<String, Plugin>,
   pub(super) view: Option<View>,
   pub(super) logs: logs::state::Logs,
-  pub(super) installation_prompt: Option<InstallConfirmationPrompt>,
+  pub(super) dialog: Option<Dialog>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Dialog {
+  InstallationPrompt(InstallConfirmationPrompt),
+  UninstallPrompt(String),
+  Error(String),
 }
 
 #[derive(Debug, Clone)]
@@ -58,7 +65,11 @@ pub enum Message {
   OpenInstallConfirmationPromptDialog(Result<InstallConfirmationPrompt, String>),
   CloseInstallConfirmationPromptDialog,
   ConfirmInstallation(InstallConfirmationPrompt),
-  InstallResponse(Result<(), String>)
+  InstallResponse(Result<(), String>),
+  InstallGetPlugins(Result<HashMap<String, Plugin>, String>),
+  #[allow(unused)]
+  OpenDialog(Dialog),
+  CloseDialog,
 }
 
 #[derive(Debug, Clone)]
@@ -75,7 +86,7 @@ impl Dashboard {
       plugins,
       view: None,
       logs: logs::state::Logs::default(),
-      installation_prompt: None,
+      dialog: None,
     }
   }
 
