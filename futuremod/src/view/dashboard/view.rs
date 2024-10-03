@@ -63,7 +63,6 @@ pub enum Message {
   StartInstallation,
   StartDevelopmentInstallation,
   OpenInstallConfirmationPromptDialog(Result<InstallConfirmationPrompt, String>),
-  CloseInstallConfirmationPromptDialog,
   ConfirmInstallation(InstallConfirmationPrompt),
   InstallResponse(Result<(), String>),
   InstallGetPlugins(Result<HashMap<String, Plugin>, String>),

@@ -188,6 +188,23 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
     Message::CloseDialog => {
       dashboard.dialog = None;
     },
+    Message::ToLogs => {
+      let (logs_view, logs_message) = logs::Logs::new();
+
+      dashboard.view = Some(View::Logs(logs_view));
+
+      return logs_message.map(Message::Logs);
+    },
+    Message::ToPlugin(name) => {
+      let plugin = dashboard.plugins.get(&name);
+      match plugin {
+        Some(_) => {
+          dashboard.view = Some(View::Plugin(view::plugin::Plugin::new(name.clone())));
+        },
+        None => {
+        }
+      }
+    },
     // Message decision tree based on view state
     message => match &mut dashboard.view {
       Some(view) => match view {
@@ -209,27 +226,8 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
           _ => (),
         }
       },
-      None => match message {
-        Message::ToLogs => {
-          let (logs_view, logs_message) = logs::Logs::new();
-
-          dashboard.view = Some(View::Logs(logs_view));
-
-          return logs_message.map(Message::Logs);
-        },
-        Message::ToPlugin(name) => {
-          let plugin = dashboard.plugins.get(&name);
-          match plugin {
-            Some(_) => {
-              dashboard.view = Some(View::Plugin(view::plugin::Plugin::new(name.clone())));
-            },
-            None => {
-            }
-          }
-        },
-        _ => (),
-      },
-    }
+      _ => (),
+    },
   }
 
   Command::none()

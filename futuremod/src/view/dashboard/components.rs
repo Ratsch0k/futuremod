@@ -341,51 +341,59 @@ fn installation_prompt<'a>(confirmation_prompt: &InstallConfirmationPrompt) -> E
   };
 
   container(
-    column![
-    text("Confirm installation").size(24.0),
-    Space::with_height(12.0),
     container(
-      scrollable(
-        Column::new()
-          .push(text(format!("Are you sure you want to install the plugin '{}'.", confirmation_prompt.plugin.name.clone())))
-          .push_maybe(warning)
-          .push(column![
-            text("General Information").size(24),
-            text(format!("Name: {}", confirmation_prompt.plugin.name.clone())),
-            text(format!("Authors: {}", confirmation_prompt.plugin.authors.clone().join(", "))),
-            text(format!("Version: {}", confirmation_prompt.plugin.version)),
-          ].spacing(4))
-          .push(column![
-            text("Description").size(24),
-            text(
-              if confirmation_prompt.plugin.description.len() <= 0 {
-                String::from("No description")
-              } else {
-                confirmation_prompt.plugin.description.clone()
-              }
-            ),
-          ].spacing(4))
-          .push(column![
-            text("Dependencies").size(24),
-            dependencies_list(&confirmation_prompt.plugin.dependencies),
-          ].spacing(4))
-          .spacing(24)
-          .padding([0, 16, 0, 8]),
-      )
+      column![
+        text("Confirm installation").size(24.0),
+        Space::with_height(12.0),
+        container(
+          scrollable(
+            Column::new()
+              .push(text(format!("Are you sure you want to install the plugin '{}'.", confirmation_prompt.plugin.name.clone())))
+              .push_maybe(warning)
+              .push(column![
+                  text("General Information").size(20),
+                  text(format!("Name: {}", confirmation_prompt.plugin.name.clone())),
+                  text(format!("Authors: {}", confirmation_prompt.plugin.authors.clone().join(", "))),
+                  text(format!("Version: {}", confirmation_prompt.plugin.version)),
+                ]
+                  .spacing(4))
+                  .push(column![
+                    text("Description").size(20),
+                    text(
+                      if confirmation_prompt.plugin.description.len() <= 0 {
+                        String::from("No description")
+                      } else {
+                        confirmation_prompt.plugin.description.clone()
+                      }
+                    ),
+                  ]
+                    .spacing(4))
+                    .push(column![
+                      text("Dependencies").size(20),
+                      dependencies_list(&confirmation_prompt.plugin.dependencies),
+                    ].spacing(4))
+                    .spacing(24)
+                    .padding([0, 16, 0, 8]),
+          )
+        )
+          .height(Length::Fill)
+          .padding([0, 0, 8, 0]),
+        row![
+          Space::with_width(Length::Fill),
+          button(text("Cancel")).style(theme::Button::Destructive).on_press(Message::CloseDialog),
+          button(text("Install")).on_press(Message::ConfirmInstallation(confirmation_prompt.clone())).style(theme::Button::Primary),
+        ]
+          .align_items(Alignment::End)
+          .spacing(8.0)
+          .width(Length::Fill)
+      ]
     )
-    .height(Length::Fill)
-    .padding([0, 0, 8, 0]),
-    row![
-      Space::with_width(Length::Fill),
-      button(text("Cancel")).style(theme::Button::Destructive).on_press(Message::CloseInstallConfirmationPromptDialog),
-      button(text("Install")).on_press(Message::ConfirmInstallation(confirmation_prompt.clone())).style(theme::Button::Primary),
-    ]
-    .align_items(Alignment::End)
-    .spacing(8.0)
-    .width(Length::Fill)
-    ])
-    .max_width(500.0)
-    .style(Container::Dialog)
-    .padding(16.0)
+      .max_width(800.0)
+      .style(Container::Dialog)
+      .padding(16.0)
+  )
+    .align_x(Horizontal::Center)
+    .align_y(Vertical::Center)
+    .padding(8.0)
     .into()
 }
