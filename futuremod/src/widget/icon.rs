@@ -30,7 +30,7 @@ pub fn icon_with_color<'a, Message>(content: Bootstrap, color: Color) -> Contain
 }
 
 #[allow(unused)]
-pub fn icon_with_style<'a, Message>(content: Bootstrap, style: theme::text::Text) -> Container<'a, Message, theme::Theme> {
+pub fn icon_with_style<'a, Message>(content: Bootstrap, style: theme::text::Text<'a>) -> Container<'a, Message, theme::Theme> {
   align_icon(icon_text(content).class(style))
 }
 

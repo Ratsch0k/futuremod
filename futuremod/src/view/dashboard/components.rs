@@ -1,8 +1,11 @@
-use futuremod_data::plugin::PluginDependency;
-use iced::{alignment::{Horizontal, Vertical}, widget::{center, column, container, mouse_area, opaque, row, rule, scrollable, text, Space, Stack}, Alignment, Length, Padding};
-use iced_fonts::Bootstrap;
+use std::time::Instant;
 
-use crate::{theme::{self, Container, Theme}, widget::{button, icon_button, icon_text_button, Column, Element}};
+use futuremod_data::plugin::PluginDependency;
+use iced::{alignment::{Horizontal, Vertical}, widget::{center, column, container, mouse_area, opaque, row, rule, scrollable, text, Space, Stack}, Alignment, Color, Length, Padding};
+use iced_fonts::Bootstrap;
+use lilt::Animated;
+
+use crate::{theme::{self, Container, Theme}, widget::{button, icon_button, icon_with_size, Column, Element, Row}};
 
 use super::{view::{Dialog, InstallConfirmationPrompt, View}, Dashboard, Message};
 
@@ -23,7 +26,7 @@ pub fn dashboard<'a>(state: &'a Dashboard) -> Element<'a, Message> {
     heading(state.is_developer),
     rule::Rule::horizontal(1.0),
     row![
-      sidebar(&state.view),
+      sidebar(&state.view, &state.sidebar_minimized),
       rule::Rule::vertical(1.0),
       content,
     ]
@@ -53,11 +56,12 @@ pub fn dashboard<'a>(state: &'a Dashboard) -> Element<'a, Message> {
     .into()
 }
 
-fn sidebar(active_view: &View) -> Element<'_, Message> {
+fn sidebar<'a>(active_view: &'a View, minimized: &'a Animated<bool, Instant>) -> Element<'a, Message> {
   container(
-    tabs(active_view)
+    tabs(active_view, &minimized)
   )
     .padding(16)
+    .width(minimized.animate_bool(200.0, 80.0, Instant::now()))
     .into()
 }
 
@@ -131,7 +135,7 @@ fn title<'a>(is_developer: bool) -> Element<'a, Message> {
   text(content).size(32.0).into()
 }
 
-fn tabs<'a>(active_view: &View) -> Element<'a, Message> {
+fn tabs<'a>(active_view: &View, minimized: &Animated<bool, Instant>) -> Element<'a, Message> {
   let is_plugin_tab = |active_view: &View| {
     match active_view {
       View::PluginList(_) | View::Plugin(_) => true,
@@ -139,15 +143,39 @@ fn tabs<'a>(active_view: &View) -> Element<'a, Message> {
     }
   };
 
-  let tab_button = |icon: Bootstrap, label: &'static str, on_press: Option<Message>, active: bool| -> Element<'_, Message> {
-    icon_text_button(icon, label)
+  let tab_button = |icon_content: Bootstrap, label: &'static str, on_press: Option<Message>, active: bool| -> Element<'_, Message> {
+    let mut content = Row::with_children([icon_with_size(icon_content, 16).into()])
+      .clip(false);
+
+    let alpha = minimized.animate_bool(1.0, 0.0, Instant::now());
+
+    if alpha > 0.1 {
+      content = content.push(
+        container(
+          text(label)
+            .wrapping(text::Wrapping::None)
+            .height(20)
+            .class(theme::Text::Custom(Box::new(move |theme| text::Style {
+              color: Some(Color{
+                a: alpha,
+                ..theme.palette.background.dark.text
+              }),
+            })))
+        )
+          .padding(Padding::default().left(8))
+      );
+    }
+
+    button(content)
       .on_press_maybe(on_press)
-      .class(if active {theme::Button::Primary} else {theme::Button::HoverHighlight})
-      .width(200)
+      .class(if active {theme::Button::Primary} else {theme::Button::Text})
+      .width(Length::Fill)
+      .clip(false)
       .into()
   };
 
   column![
+    tab_button(if !minimized.value {Bootstrap::ChevronDoubleLeft} else {Bootstrap::ChevronDoubleRight}, "Minimize", Some(Message::ToggleSidebar), false),
     tab_button(Bootstrap::Box, "Plugins", Some(Message::ToPluginList), is_plugin_tab(&active_view)),
     tab_button(Bootstrap::CardText, "Logs", Some(Message::ToLogs), matches!(active_view, View::Logs(_))),
     Space::with_height(Length::Fill),

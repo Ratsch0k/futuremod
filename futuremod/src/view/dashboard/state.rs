@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use iced::Task;
 use log::{debug, info, warn};
 use rfd::FileDialog;
@@ -213,6 +215,9 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
         None => {
         }
       }
+    },
+    Message::ToggleSidebar => {
+      dashboard.sidebar_minimized.transition(!dashboard.sidebar_minimized.value, Instant::now());
     },
     // Message decision tree based on view state
     message => match &mut dashboard.view {

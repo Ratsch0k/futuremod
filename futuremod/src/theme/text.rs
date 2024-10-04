@@ -2,18 +2,19 @@ use iced::{widget::text, Color};
 
 use super::theme::Theme;
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default)]
 #[allow(unused)]
-pub enum Text {
+pub enum Text<'a> {
   #[default]
   Default,
   Color(Color),
   Warn,
   Danger,
+  Custom(Box<dyn Fn(&Theme) -> text::Style + 'a>),
 }
 
 impl text::Catalog for Theme {
-    type Class<'a> = Text;
+    type Class<'a> = Text<'a>;
 
     fn default<'a>() -> Self::Class<'a> {
         Text::default()
@@ -30,5 +31,6 @@ fn appearance(theme: &Theme, style: &Text) -> text::Style {
     Text::Color(c) => text::Style { color: Some(*c) },
     Text::Warn => text::Style { color: Some(theme.palette.warning.medium.color) },
     Text::Danger => text::Style { color: Some(theme.palette.danger.medium.color )},
+    Text::Custom(class) => class(theme),
   }
 }

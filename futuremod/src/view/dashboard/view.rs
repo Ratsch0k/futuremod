@@ -1,7 +1,8 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, time::Instant};
 
 use futuremod_data::plugin::{Plugin, PluginInfo};
-use iced::{Task, Subscription};
+use iced::{window::frames, Subscription, Task};
+use lilt::{Animated, Easing};
 
 use crate::{config::get_config, logs, view::{self, plugin_list}, widget::Element};
 
@@ -22,6 +23,7 @@ pub struct Dashboard {
   pub(super) view: View,
   pub(super) logs: logs::state::Logs,
   pub(super) dialog: Option<Dialog>,
+  pub(super) sidebar_minimized: Animated<bool, Instant>,
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +69,8 @@ pub enum Message {
   #[allow(unused)]
   OpenDialog(Dialog),
   CloseDialog,
+  ToggleSidebar,
+  Tick,
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +88,7 @@ impl Dashboard {
       view: View::PluginList(plugin_list::PluginList::new()),
       logs: logs::state::Logs::default(),
       dialog: None,
+      sidebar_minimized: Animated::new(false).duration(250.0).easing(Easing::EaseOut),
     }
   }
 
@@ -98,6 +103,9 @@ impl Dashboard {
   pub fn subscription(&self) -> Subscription<Message> {
     let config = get_config();
     
-    Subscription::run_with_id("log_websocket", crate::logs::subscriber::connect(config.mod_address.clone())).map(Message::LogEvent)
+    Subscription::batch([
+      Subscription::run_with_id("log_websocket", crate::logs::subscriber::connect(config.mod_address.clone())).map(Message::LogEvent),
+      frames().map(|_| Message::Tick),
+    ])
   }
 }
