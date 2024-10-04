@@ -1,5 +1,5 @@
 use iced::{widget::row, Alignment, Pixels};
-use iced_aw::BootstrapIcon;
+use iced_fonts::Bootstrap;
 
 use crate::theme::{self, Theme};
 use super::{icon_with_size, Element};
@@ -10,15 +10,15 @@ pub fn button<'a, Message>(content: impl Into<Element<'a, Message>>) -> iced::wi
 
 #[allow(unused)]
 pub fn hover_button<'a, Message>(content: impl Into<Element<'a, Message>>) -> iced::widget::Button<'a, Message, Theme> {
-  button(content).style(theme::Button::HoverHighlight)
+  button(content).class(theme::button::Button::HoverHighlight)
 }
 
 #[allow(unused)]
-pub fn icon_button<'a, Message: 'a>(icon: BootstrapIcon) -> iced::widget::Button<'a, Message, Theme> {
-  button(crate::widget::icon(icon)).style(theme::Button::HoverHighlight)
+pub fn icon_button<'a, Message: 'a>(icon: Bootstrap) -> iced::widget::Button<'a, Message, Theme> {
+  button(crate::widget::icon(icon)).class(theme::button::Button::HoverHighlight)
 }
 
-pub fn icon_text_button<'a, Message: 'a>(icon_content: BootstrapIcon, content: impl Into<Element<'a, Message>>) -> iced::widget::Button<'a, Message, Theme> {
+pub fn icon_text_button<'a, Message: 'a>(icon_content: Bootstrap, content: impl Into<Element<'a, Message>>) -> iced::widget::Button<'a, Message, Theme> {
   icon_text_button_advanced(icon_content, content, IconTextButtonOptions::default())
 }
 
@@ -50,14 +50,14 @@ impl IconTextButtonOptions {
   }
 }
 
-pub fn icon_text_button_advanced<'a, Message: 'a>(icon_content: BootstrapIcon, content: impl Into<Element<'a, Message>>, options: IconTextButtonOptions) -> iced::widget::Button<'a, Message, Theme> {
+pub fn icon_text_button_advanced<'a, Message: 'a>(icon_content: Bootstrap, content: impl Into<Element<'a, Message>>, options: IconTextButtonOptions) -> iced::widget::Button<'a, Message, Theme> {
   button(
     row![
       icon_with_size(icon_content, options.icon_size),
       content.into(),
     ]
       .spacing(options.spacing)
-      .align_items(Alignment::Center)
+      .align_y(Alignment::Center)
   )
-    .style(theme::Button::HoverHighlight)
+    .class(theme::button::Button::HoverHighlight)
 }

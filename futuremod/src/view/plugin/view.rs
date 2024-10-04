@@ -1,4 +1,4 @@
-use iced::Command;
+use iced::Task;
 
 use crate::widget::Element;
 
@@ -25,8 +25,8 @@ impl Plugin {
   }
 
   #[allow(unused)]
-  pub fn update(&mut self, plugin: &mut futuremod_data::plugin::Plugin, message: Message) -> Command<Message> {
-    Command::none()
+  pub fn update(&mut self, plugin: &mut futuremod_data::plugin::Plugin, message: Message) -> Task<Message> {
+    Task::none()
   }
 
   pub fn view<'a>(&self, plugin: &futuremod_data::plugin::Plugin) -> Element<'a, Message> {

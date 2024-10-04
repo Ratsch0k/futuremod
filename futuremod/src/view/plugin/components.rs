@@ -1,15 +1,15 @@
 use futuremod_data::plugin::{Plugin, PluginDependency, PluginState};
-use iced::{widget::{column, container, row, rule, text, Scrollable, Toggler}, Alignment, Length};
-use iced_aw::BootstrapIcon;
+use iced::{widget::{column, container, row, rule, text, Scrollable, Toggler}, Alignment, Length, Padding};
+use iced_fonts::Bootstrap;
 
 use crate::{theme::{self, Button}, widget::{button, icon, icon_text_button, icon_text_button_advanced, Column, Element, IconTextButtonOptions, Row}};
 
 use super::Message;
 
 fn plugin_reload_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
-  icon_text_button(BootstrapIcon::ArrowClockwise ,"Reload")
+  icon_text_button(Bootstrap::ArrowClockwise,"Reload")
     .on_press(Message::Reload(plugin.info.name.clone()))
-    .style(Button::Primary)
+    .class(Button::Primary)
     .into()
 }
 
@@ -30,9 +30,9 @@ fn plugin_details_state<'a>(plugin: &Plugin) -> Element<'a, Message> {
 }
 
 fn plugin_uninstall_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
-  icon_text_button_advanced(BootstrapIcon::X,"Uninstall", IconTextButtonOptions::default().with_icon_size(24)).padding([3.0, 16.0, 3.0, 8.0])
+  icon_text_button_advanced(Bootstrap::X,"Uninstall", IconTextButtonOptions::default().with_icon_size(24)).padding(Padding{top: 3.0, right: 16.0, bottom: 3.0, left: 8.0})
   .on_press(Message::UninstallPrompt(plugin.info.name.clone()))
-  .style(Button::Destructive)
+  .class(Button::Destructive)
   .into()
 }
 
@@ -46,34 +46,36 @@ pub fn plugin_details_view<'a>(plugin: &Plugin, show_reload_success_msg: bool) -
     container(
       column![
         row![
-          button(icon(BootstrapIcon::ArrowLeft)).style(Button::Text).on_press(Message::GoBack),
+          button(icon(Bootstrap::ArrowLeft)).class(Button::Text).on_press(Message::GoBack),
           text(plugin.info.name.clone()).size(24),
-        ].spacing(16).padding([0, 0, 8, 0]).align_items(Alignment::Center),
+        ].spacing(16).padding(Padding{top: 0.0, right: 0.0, bottom: 8.0, left: 0.0}).align_y(Alignment::Center),
         row![
           text(plugin.info.version.clone()),
           text(format!("by {}", plugin.info.authors.join(", "))),
-        ].spacing(8).padding([0, 0, 16, 0]),
+        ].spacing(8).padding(Padding{top: 0.0, right: 0.0, bottom: 16.0, left: 0.0}),
         Row::new()
           .push(plugin_reload_button(plugin))
           .push_maybe(plugin_toggle_button(plugin))
           .push(plugin_uninstall_button(plugin))
           .push_maybe(reload_success_msg)
           .spacing(8)
-          .padding([0, 0, 8, 0])
-          .align_items(Alignment::Center),
+          .padding(Padding{top: 0.0, right: 0.0, bottom: 8.0, left: 0.0})
+          .align_y(Alignment::Center),
         plugin_details_state(plugin),
       ]
     ).padding(8),
-    container(rule::Rule::horizontal(1.0)).padding([0, 8, 0, 8]),
+    container(rule::Rule::horizontal(1.0)).padding(Padding{top: 0.0, right: 8.0, bottom: 0.0, left: 8.0}),
     plugin_details_content(plugin),
   ]
   .into()
 }
 
 fn plugin_description<'a>(description: String) -> Element<'a, Message> {
-  let lines: Vec<Element<'a, Message>> = description
-    .replace("\r\n", "\n")
-    .split("\n")
+  let cleaned_description = description.replace("\r\n", "\n");
+  let lines: Vec<String> = cleaned_description.split("\n").map(str::to_string).collect();
+
+  let lines: Vec<Element<'a, Message>> = lines
+    .into_iter()
     .map(|line| Into::<Element<'a, Message>>::into(text(line)))
     .collect();
 
@@ -103,7 +105,7 @@ fn plugin_details_content<'a>(plugin: &Plugin) -> Element<'a, Message> {
       ]
     ]
     .spacing(24)
-    .padding([8, 8, 8, 8])
+    .padding(8)
   )
   .into()
 }
@@ -112,7 +114,7 @@ fn dependencies_list<'a>(dependencies: &Vec<PluginDependency>) -> Element<'a, Me
   let mut list: Vec<Element<'a, Message>> = Vec::new();
 
   if dependencies.contains(&PluginDependency::Dangerous) {
-    list.push(text("This plugin has a dangerous dependency. This means it is effectively able to escape the usual safety features. Make sure to audit the plugin.").style(theme::Text::Warn).into())
+    list.push(text("This plugin has a dangerous dependency. This means it is effectively able to escape the usual safety features. Make sure to audit the plugin.").class(theme::Text::Warn).into())
   }
 
   if dependencies.len() == 0 {
@@ -141,14 +143,13 @@ fn plugin_toggle_button<'a>(plugin: &Plugin) -> Option<Element<'a, Message>> {
 
   Some(
     container(
-      Toggler::new(
-        String::from(label),
-        enabled, 
-        move |state| match state {
-          true => Message::Enable(plugin_name.clone()),
-          false => Message::Disable(plugin_name.clone()),
-        }
-    ).width(120)
+      Toggler::new(enabled)
+        .label(label)
+        .on_toggle(move |state| match state {
+            true => Message::Enable(plugin_name.clone()),
+            false => Message::Disable(plugin_name.clone()),
+          })
+        .width(120)
   ).into()
   )
 }

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use futuremod_data::plugin::{Plugin, PluginInfo};
-use iced::{Command, Subscription};
+use iced::{Task, Subscription};
 
 use crate::{config::get_config, logs, widget::Element, view};
 
@@ -89,7 +89,7 @@ impl Dashboard {
     }
   }
 
-  pub fn update(&mut self, message: Message) -> Command<Message> {
+  pub fn update(&mut self, message: Message) -> Task<Message> {
     state::update(self, message)
   }
 
@@ -100,6 +100,6 @@ impl Dashboard {
   pub fn subscription(&self) -> Subscription<Message> {
     let config = get_config();
     
-    crate::logs::subscriber::connect(config.mod_address.clone()).map(Message::LogEvent)
+    Subscription::run_with_id("log_websocket", crate::logs::subscriber::connect(config.mod_address.clone())).map(Message::LogEvent)
   }
 }

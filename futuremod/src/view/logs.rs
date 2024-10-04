@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use futuremod_data::plugin::Plugin;
-use iced::{alignment::{Horizontal, Vertical}, widget::{checkbox, column, container, row, scrollable::{Alignment, Direction, Properties, Scrollable}, text}, Command, Length, Renderer};
+use iced::{alignment::{Horizontal, Vertical}, widget::{checkbox, column, container, row, scrollable::{Direction, Scrollable, Scrollbar}, text}, Length, Renderer, Task};
 use iced_aw::{menu::{Item, Menu}, menu_bar, menu_items};
 
 use crate::{api::get_plugins, logs::{self, state::LogState, subscriber::LogRecord}, theme::{Button, Theme}, widget::bold};
@@ -70,7 +70,7 @@ fn log_level_to_text(level: &str) -> Element<Message> {
 
 
     message
-    .style(theme::Text::Color(color))
+    .class(theme::Text::Color(color))
     .font(iced::Font{
         weight: iced::font::Weight::Bold,
         ..iced::Font::default()
@@ -79,10 +79,10 @@ fn log_level_to_text(level: &str) -> Element<Message> {
 }
 
 impl Logs {
-  pub fn new() -> (Self, Command<Message>) {
+  pub fn new() -> (Self, Task<Message>) {
     (
       Logs::Loading,
-      Command::perform(get_plugins(), Message::GetPluginResponse),
+      Task::perform(get_plugins(), Message::GetPluginResponse),
     )
   }
 
@@ -150,7 +150,7 @@ impl Logs {
                       .font(bold())
                   },
                   None => {
-                    text(&message.target.replace("futuremod_engine::", ""))
+                    text(message.target.replace("futuremod_engine::", ""))
                   }
                 };
 
@@ -176,7 +176,7 @@ impl Logs {
                 lines
                 ).padding([0.0, 8.0])
               )
-              .direction(Direction::Vertical(Properties::new().alignment(Alignment::End)))
+              .direction(Direction::Vertical(Scrollbar::new()))
               .width(Length::Fill)
               .into()
           },
@@ -201,7 +201,7 @@ impl Logs {
   }
 }
 
-  pub fn update(&mut self, message: Message) -> Command<Message> {
+  pub fn update(&mut self, message: Message) -> Task<Message> {
     match self {
       Logs::Loading => {
         match message {
@@ -218,45 +218,45 @@ impl Logs {
               }
             };
 
-            Command::none()
+            Task::none()
           },
-          _ => Command::none(),
+          _ => Task::none(),
         }
       },
       Logs::View(logs) => {
         match message {
           Message::ToggleHistory(unlimited_history) => {
             logs.unlimited_history = unlimited_history;
-              Command::none()
+              Task::none()
           },
           Message::ToggleLevelDebug(value) => {
             logs.selected_log_levels.debug = value;
   
-            Command::none()
+            Task::none()
           },
           Message::ToggleLevelInfo(value) => {
             logs.selected_log_levels.info = value;
   
-            Command::none()
+            Task::none()
           },
           Message::ToggleLevelWarn(value) => {
             logs.selected_log_levels.warn = value;
   
-            Command::none()
+            Task::none()
           },
           Message::ToggleLevelError(value) => {
             logs.selected_log_levels.error = value;
   
-            Command::none()
+            Task::none()
           },
           Message::ChangeOriginSelection(origin, value) => {
             logs.selected_origins.insert(origin, value);
-            Command::none()
+            Task::none()
           }
-          _ => Command::none(),
+          _ => Task::none(),
         }
       },
-      Logs::Error(_) => Command::none(),
+      Logs::Error(_) => Task::none(),
     }
   }
 }
@@ -267,12 +267,12 @@ fn header<'a>(unlimited_history: bool, selected_levels: &SelectedLogLevels, plug
         origin_picker(plugins, selected_origins),
         level_picker(&selected_levels),
         checkbox("Unlimited history", unlimited_history).on_toggle(Message::ToggleHistory),
-    ].spacing(16).padding(16.0).align_items(iced::Alignment::Center)
+    ].spacing(16).padding(16.0).align_y(iced::Alignment::Center)
     .into()
 }
 
 fn level_picker<'a>(log_levels: &SelectedLogLevels) -> Element<'a, Message> {
-  let filter_button = button("Log Level").on_press(Message::None).style(Button::Text);
+  let filter_button = button("Log Level").on_press(Message::None).class(Button::Text);
 
   menu_bar!(
       (
@@ -293,7 +293,7 @@ fn level_picker<'a>(log_levels: &SelectedLogLevels) -> Element<'a, Message> {
 }
 
 fn origin_picker<'a>(plugins: &HashMap<String, Plugin>, selected_origins: &HashMap<LogOrigin, bool>) -> Element<'a, Message> {
-  let filter_button = button("Origin").on_press(Message::None).style(Button::Text);
+  let filter_button = button("Origin").on_press(Message::None).class(Button::Text);
 
   let mut items: Vec<Item<Message, Theme, Renderer>> = Vec::new();
 

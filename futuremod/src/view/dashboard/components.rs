@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use futuremod_data::plugin::{Plugin, PluginDependency, PluginState};
-use iced::{alignment::{Horizontal, Vertical}, widget::{column, container, row, rule, scrollable, text, Space, Toggler}, Alignment, Length};
-use iced_aw::{modal, Badge, BootstrapIcon};
+use iced::{alignment::{Horizontal, Vertical}, widget::{center, column, container, mouse_area, opaque, row, rule, scrollable, text, Space, Stack, Toggler}, Alignment, Length, Padding};
+use iced_aw::Badge;
+use iced_fonts::Bootstrap;
 use log::warn;
 
 use crate::{theme::{self, Container, Theme}, widget::{bold, button, icon_button, icon_text_button, icon_text_button_advanced, Column, Element, IconTextButtonOptions, Row}};
@@ -32,16 +33,29 @@ pub fn dashboard<'a>(state: &'a Dashboard) -> Element<'a, Message> {
 
   let mut overlay: Option<Element<Message>> = None;
   if let Some(active_dialog) = &state.dialog {
-    overlay = Some(dialog(active_dialog));
+    overlay = Some(
+      opaque(
+        mouse_area(
+          center(
+            opaque(
+                dialog(active_dialog)
+              )
+            )
+              .class(Container::Backdrop)
+        )
+          .on_press(Message::CloseDialog)
+      )
+    );
   }
 
-  modal(underlay, overlay)
-    .on_esc(Message::CloseDialog)
-    .backdrop(Message::CloseDialog)
+  Stack::with_children([underlay])
+    .push_maybe(overlay)
+    .width(Length::Fill)
+    .height(Length::Fill)
     .into()
 }
 
-fn dialog<'a>(active_dialog: &Dialog) -> Element<'a, Message> {
+fn dialog<'a>(active_dialog: &'a Dialog) -> Element<'a, Message> {
   match active_dialog {
     Dialog::InstallationPrompt(prompt) => installation_prompt(prompt),
     Dialog::Error(error) => error_dialog(error),
@@ -52,56 +66,56 @@ fn dialog<'a>(active_dialog: &Dialog) -> Element<'a, Message> {
 fn uninstall_prompt<'a>(plugin_name: String) -> Element<'a, Message> {
   container(
     column![
-      dialog_header(format!("Uninstall {}", plugin_name).as_str()),
+      dialog_header(format!("Uninstall {}", plugin_name)),
       Space::with_height(16),
       text("Uninstalling a plugin cannot be undone. Are you sure?"),
       Space::with_height(24),
       row![
         Space::with_width(Length::Fill),
         button("Cancel").on_press(Message::CloseDialog),
-        button("Uninstall").on_press(Message::Uninstall(plugin_name)).style(theme::Button::Destructive),
+        button("Uninstall").on_press(Message::Uninstall(plugin_name)).class(theme::Button::Destructive),
       ]
         .spacing(8),
     ]
   )
-    .style(Container::Dialog)
+    .class(Container::Dialog)
     .padding(16)
     .max_width(500)
     .into()
 }
 
-fn error_dialog<'a>(error: &String) -> Element<'a, Message> {
+fn error_dialog<'a>(error: &'a String) -> Element<'a, Message> {
   container(
     column![
-      dialog_header("Error"),
+      dialog_header(String::from("Error")),
       Space::with_height(16),
       text(error),
     ]
   )
-    .style(Container::Dialog)
+    .class(Container::Dialog)
     .padding(16)
     .max_width(500)
     .into()
 }
 
-fn dialog_header<'a>(title: &str) -> Element<'a, Message> {
+fn dialog_header<'a>(title: String) -> Element<'a, Message> {
   row![
     container(text(title).size(24)).width(Length::Fill),
-    icon_button(BootstrapIcon::X).on_press(Message::CloseDialog).style(theme::Button::Text),
+    icon_button(Bootstrap::X).on_press(Message::CloseDialog).class(theme::Button::Text),
   ]
-    .align_items(Alignment::Center)
+    .align_y(Alignment::Center)
     .into()
 }
 
 fn heading<'a>(is_developer: bool, active_view: &Option<View>) -> Element<'a, Message> {
   row![
-    container(title(is_developer)).width(Length::Fill).padding([0, 0, 0, 8]),
+    container(title(is_developer)).width(Length::Fill).padding(Padding{top: 0.0, right: 0.0, bottom: 0.0, left: 8.0}),
     container(
       tabs(active_view)
     )
       .padding(8.0),
   ]
-    .align_items(Alignment::Center)
+    .align_y(Alignment::Center)
     .into()
 }
 
@@ -123,20 +137,20 @@ fn tabs<'a>(active_view: &Option<View>) -> Element<'a, Message> {
   };
 
   row![
-    icon_text_button(BootstrapIcon::Box, "Plugins")
+    icon_text_button(Bootstrap::Box, "Plugins")
       .on_press(Message::ToPlugins)
-      .style(if is_plugin_tab(&active_view) {theme::Button::Primary} else {theme::Button::HoverHighlight}),
-    icon_text_button(BootstrapIcon::CardText, "Logs")
+      .class(if is_plugin_tab(&active_view) {theme::Button::Primary} else {theme::Button::HoverHighlight}),
+    icon_text_button(Bootstrap::CardText, "Logs")
       .on_press(Message::ToLogs)
-      .style(if let Some(View::Logs(_)) = active_view {theme::Button::Primary} else {theme::Button::HoverHighlight}),
-    icon_text_button(BootstrapIcon::Gear, "Settings")
+      .class(if let Some(View::Logs(_)) = active_view {theme::Button::Primary} else {theme::Button::HoverHighlight}),
+    icon_text_button(Bootstrap::Gear, "Settings")
       .on_press(Message::ToSettings),
   ]
     .spacing(8.0)
     .into()
 }
 
-fn plugin_overview<'a>(plugins: &HashMap<String, Plugin>, is_developer: bool) -> Element<'a, Message> {
+fn plugin_overview<'a>(plugins: &'a HashMap<String, Plugin>, is_developer: bool) -> Element<'a, Message> {
   column![
     plugin_overview_heading(is_developer),
     plugin_list(plugins),
@@ -160,16 +174,16 @@ fn plugin_overview_actions<'a>(is_developer: bool) -> Element<'a, Message> {
 
   if is_developer {
     actions = actions.push(
-      icon_text_button(BootstrapIcon::Bug, "Install as Developer")
-        .style(theme::Button::Default)
+      icon_text_button(Bootstrap::Bug, "Install as Developer")
+        .class(theme::Button::Default)
         .on_press(Message::StartDevelopmentInstallation)
     );
   }
 
   actions = actions.push(
-    icon_text_button_advanced(BootstrapIcon::Plus, "Install", IconTextButtonOptions::new().with_icon_size(24))
-      .style(theme::Button::Primary)
-      .padding([3, 16, 3, 12])
+    icon_text_button_advanced(Bootstrap::Plus, "Install", IconTextButtonOptions::new().with_icon_size(24))
+      .class(theme::Button::Primary)
+      .padding(Padding{top: 3.0, right: 16.0, bottom: 3.0, left: 12.0})
       .on_press(Message::StartInstallation)
   );
 
@@ -178,7 +192,7 @@ fn plugin_overview_actions<'a>(is_developer: bool) -> Element<'a, Message> {
     .into()
 }
 
-fn plugin_list<'a>(plugins: &HashMap<String, Plugin>) -> Element<'a, Message> {
+fn plugin_list<'a>(plugins: &'a HashMap<String, Plugin>) -> Element<'a, Message> {
   let mut list = Column::new();
 
   let mut keys: Vec<&String> = plugins.keys().collect();
@@ -200,7 +214,7 @@ fn plugin_list<'a>(plugins: &HashMap<String, Plugin>) -> Element<'a, Message> {
     .into()
 }
 
-fn plugin_card<'a>(name: &String, plugin: &Plugin) -> Element<'a, Message> {
+fn plugin_card<'a>(name: &'a String, plugin: &Plugin) -> Element<'a, Message> {
   container(
     row![
       Column::new()
@@ -210,9 +224,9 @@ fn plugin_card<'a>(name: &String, plugin: &Plugin) -> Element<'a, Message> {
         .spacing(8.0),
       plugin_card_actions(&plugin),
     ]
-    .align_items(Alignment::Center)
+    .align_y(Alignment::Center)
   )
-  .style(Container::Box)
+  .class(Container::Box)
   .padding(16)
   .into()
 }
@@ -222,7 +236,7 @@ fn plugin_card_actions<'a>(plugin: &Plugin) -> Element<'a, Message> {
     .push(plugin_go_to_details_button(&plugin))
     .push_maybe(plugin_toggle_button(&plugin))
     .spacing(8)
-    .align_items(Alignment::Center)
+    .align_y(Alignment::Center)
     .into()
 }
 
@@ -230,7 +244,7 @@ fn plugin_card_description<'a>(plugin: &Plugin) -> Element<'a, Message> {
   let dev_mode_badge: Option<Element<'a, Message>> = match &plugin.in_dev_mode {
     false => None,
     true => Some(Badge::new(text("Developer Mode").font(bold()).size(12))
-      .style(theme::BadgeStyles::Warning)
+      .style(|theme: &theme::Theme, status| iced_aw::style::badge::warning(&theme.theme, status))
       .padding(4)
       .into()),
   };
@@ -238,7 +252,7 @@ fn plugin_card_description<'a>(plugin: &Plugin) -> Element<'a, Message> {
   Row::new()
     .push(plugin_state_component(plugin))
     .push_maybe(dev_mode_badge)
-    .align_items(Alignment::Center)
+    .align_y(Alignment::Center)
     .spacing(4.0)
     .into()
 }
@@ -264,7 +278,7 @@ fn plugin_state_component<'a>(plugin: &Plugin) -> Element<'a, Message> {
 fn plugin_go_to_details_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
   button(text("Details"))
     .on_press(Message::ToPlugin(plugin.info.name.clone()))
-    .style(theme::Button::Default)
+    .class(theme::Button::Default)
     .into()
 }
 
@@ -283,14 +297,13 @@ fn plugin_toggle_button<'a>(plugin: &Plugin) -> Option<Element<'a, Message>> {
 
   Some(
     container(
-      Toggler::new(
-        String::from(label),
-        enabled, 
-        move |state| match state {
+      Toggler::new(enabled)
+        .label(label)
+        .on_toggle(move |state| match state {
           true => Message::Enable(plugin_name.clone()),
           false => Message::Disable(plugin_name.clone()),
-        }
-    ).width(120)
+        })
+        .width(120)
   ).into()
   )
 }
@@ -299,7 +312,7 @@ fn dependencies_list<'a>(dependencies: &Vec<PluginDependency>) -> Element<'a, Me
   let mut list: Vec<Element<'a, Message>> = Vec::new();
 
   if dependencies.contains(&PluginDependency::Dangerous) {
-    list.push(text("This plugin has a dangerous dependency. This means it is effectively able to escape the usual safety features. Make sure to audit the plugin.").style(theme::Text::Warn).into())
+    list.push(text("This plugin has a dangerous dependency. This means it is effectively able to escape the usual safety features. Make sure to audit the plugin.").class(theme::Text::Warn).into())
   }
 
   if dependencies.len() == 0 {
@@ -333,7 +346,7 @@ fn installation_prompt<'a>(confirmation_prompt: &InstallConfirmationPrompt) -> E
       container(
         text("This plugin has a dangerous dependency. This plugin can easily access your entire computer. Only install plugins with dangerous dependency if you are sure they are not malicious.")
       )
-      .style(Container::Warning)
+      .class(Container::Warning)
       .padding(8)
     )
   } else {
@@ -373,23 +386,25 @@ fn installation_prompt<'a>(confirmation_prompt: &InstallConfirmationPrompt) -> E
                       dependencies_list(&confirmation_prompt.plugin.dependencies),
                     ].spacing(4))
                     .spacing(24)
-                    .padding([0, 16, 0, 8]),
+                    .padding(Padding{top: 0.0, right: 16.0, bottom: 0.0, left: 8.0}),
           )
         )
           .height(Length::Fill)
-          .padding([0, 0, 8, 0]),
+          .padding(Padding{top: 0.0, right: 0.0, bottom: 8.0, left: 0.0}),
         row![
           Space::with_width(Length::Fill),
-          button(text("Cancel")).style(theme::Button::Destructive).on_press(Message::CloseDialog),
-          button(text("Install")).on_press(Message::ConfirmInstallation(confirmation_prompt.clone())).style(theme::Button::Primary),
+          button(text("Cancel")).class(theme::Button::Destructive).on_press(Message::CloseDialog),
+          button(text("Install")).on_press(Message::ConfirmInstallation(confirmation_prompt.clone())).class(theme::Button::Primary),
         ]
-          .align_items(Alignment::End)
+          .align_y(Alignment::End)
           .spacing(8.0)
           .width(Length::Fill)
+          .height(Length::Fixed(60.0))
       ]
     )
+      .height(Length::Shrink)
       .max_width(800.0)
-      .style(Container::Dialog)
+      .class(Container::Dialog)
       .padding(16.0)
   )
     .align_x(Horizontal::Center)

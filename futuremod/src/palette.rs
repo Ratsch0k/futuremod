@@ -28,7 +28,6 @@ pub struct Palette {
   pub success: ColorRange,
   pub warning: ColorRange,
   pub danger: ColorRange,
-  pub is_dark: bool,
 }
 
 impl Default for Palette {
@@ -94,7 +93,6 @@ impl Default for Palette {
             text: color!(0xFFFFFF),
           },
         },
-        is_dark: true,
       }
     }
 }

@@ -1,4 +1,4 @@
-use iced::Command;
+use iced::Task;
 use log::{debug, info, warn};
 use rfd::FileDialog;
 
@@ -6,29 +6,29 @@ use crate::{api::{self, get_plugins, reload_plugin}, util::{get_plugin_info_of_l
 
 use super::{view::View, Dashboard, Message};
 
-pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
+pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
   // Process some unique messages
   match message {
     Message::LogEvent(log_event) => dashboard.logs.handle_event(&log_event),
     Message::ResetView => {
       let plugins = dashboard.plugins.clone();
       *dashboard = Dashboard::new(plugins, dashboard.is_developer);
-      return Command::none();
+      return Task::none();
     },
     Message::Enable(plugin) | Message::Plugin(view::plugin::Message::Enable(plugin)) => {
-      return Command::perform(async move {
+      return Task::perform(async move {
         api::enable_plugin(plugin).await.map_err(|e| e.to_string())
       }, Message::EnableResponse);
     },
     Message::Disable(plugin) | Message::Plugin(view::plugin::Message::Disable(plugin)) => {
-      return Command::perform(async {
+      return Task::perform(async {
         api::disable_plugin(plugin).await.map_err(|e| e.to_string())
       }, Message::DisableResponse);
     },
     Message::EnableResponse(response) => {
       match response {
         Ok(()) => {
-          return Command::perform(api::get_plugins(), Message::GetPluginsResponse);
+          return Task::perform(api::get_plugins(), Message::GetPluginsResponse);
         },
         Err(e) => {
           dashboard.dialog = Some(Dialog::Error(format!("Could not enable the plugin: {}", e).to_string()));
@@ -39,7 +39,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
     Message::DisableResponse(response) => {
       match response {
         Ok(()) => {
-          return Command::perform(api::get_plugins(), Message::GetPluginsResponse);
+          return Task::perform(api::get_plugins(), Message::GetPluginsResponse);
         },
         Err(e) => {
           dashboard.dialog = Some(Dialog::Error(format!("Could not disable the plugin: {}", e).to_string()));
@@ -61,7 +61,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
       dashboard.dialog = Some(Dialog::UninstallPrompt(plugin_name));
     },
     Message::Uninstall(name) => {
-      return Command::perform(async move {api::uninstall_plugin(name).await.map_err(|e| e.to_string())}, Message::UninstallResponse);
+      return Task::perform(async move {api::uninstall_plugin(name).await.map_err(|e| e.to_string())}, Message::UninstallResponse);
     },
     Message::UninstallResponse(response) => {
       match response {
@@ -69,7 +69,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
           // Navigate back to plugin list
           dashboard.view = None;
           dashboard.dialog = None;
-          return Command::perform(get_plugins(), Message::GetPluginsResponse)
+          return Task::perform(get_plugins(), Message::GetPluginsResponse)
         },
         Err(e) => {
           warn!("Could not uninstall error: {}", e);
@@ -78,11 +78,11 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
       }
     },
     Message::Reload(name) | Message::Plugin(view::plugin::Message::Reload(name)) => {
-      return Command::perform(async move {reload_plugin(&name).await.map_err(|e| format!("{}", e))}, Message::ReloadResponse);
+      return Task::perform(async move {reload_plugin(&name).await.map_err(|e| format!("{}", e))}, Message::ReloadResponse);
     },
     Message::ReloadResponse(response) => {
       match response {
-        Ok(()) => return Command::perform(get_plugins(), Message::GetPluginsResponse),
+        Ok(()) => return Task::perform(get_plugins(), Message::GetPluginsResponse),
         Err(e) => {
           warn!("Could not reload plugin: {}", e);
           dashboard.dialog = Some(Dialog::Error(format!("Could not reload the plugin: {}", e).to_string()));
@@ -98,12 +98,12 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
         .add_filter("Plugin Package", &["zip"])
         .pick_file() {
           Some(v) => v,
-          None => return Command::none(),
+          None => return Task::none(),
       };
 
       info!("Get plugin info of plugin package at '{}'", plugin_package.display());
 
-      return Command::perform(async {
+      return Task::perform(async {
         let response = api::get_plugin_info(plugin_package.clone()).await.map_err(|e| e.to_string())?;
 
         Ok(InstallConfirmationPrompt {
@@ -118,7 +118,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
         .set_title("Select the Plugin Directory to install in development mode")
         .pick_folder() {
           Some(v) => v,
-          None => return Command::none(),
+          None => return Task::none(),
       };
 
       info!("Selected plugin folder at '{}'", plugin_package.display());
@@ -127,19 +127,19 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
       match is_plugin_folder(&plugin_package) {
         Ok(false) => {
           warn!("The directory does not contain a valid plugin");
-          return Command::none();
+          return Task::none();
         },
         Err(e) => {
           warn!("Could not check the folder: {}", e);
           
-          return Command::none()
+          return Task::none()
         },
         _ => (),
       };
 
       info!("Get plugin info of plugin package at '{}'", plugin_package.display());
 
-      return Command::perform(async move {
+      return Task::perform(async move {
         let response = get_plugin_info_of_local_folder(&plugin_package).map_err(|e| e.to_string())?;
 
         Ok(InstallConfirmationPrompt {
@@ -163,7 +163,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
     Message::ConfirmInstallation(confirmed_prompt) => {
       info!("Install plugin package at '{}'", confirmed_prompt.path.display());
 
-      return Command::perform(async move {
+      return Task::perform(async move {
         match confirmed_prompt.in_developer_mode {
           false => api::install_plugin(&confirmed_prompt.path).await.map_err(|e| e.to_string()),
           true => api::install_plugin_in_developer_mode(&confirmed_prompt.path).await.map_err(|e| e.to_string()),
@@ -173,7 +173,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
     Message::InstallResponse(response) => {
       match response {
         Ok(()) => {
-          return Command::perform(async {get_plugins().await.map_err(|e| e.to_string())}, Message::InstallGetPlugins);
+          return Task::perform(async {get_plugins().await.map_err(|e| e.to_string())}, Message::InstallGetPlugins);
         },
         Err(e) => {
           warn!("Could not install plugin: {}", e);
@@ -183,7 +183,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
     },
     Message::InstallGetPlugins(response) => {
       dashboard.dialog = None;
-      return Command::perform(async {}, |_| Message::GetPluginsResponse(response));
+      return Task::done(Message::GetPluginsResponse(response));
     },
     Message::CloseDialog => {
       dashboard.dialog = None;
@@ -230,5 +230,5 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Command<Message> {
     },
   }
 
-  Command::none()
+  Task::none()
 }
