@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use futuremod_data::plugin::{Plugin, PluginInfo};
 use iced::{Task, Subscription};
 
-use crate::{config::get_config, logs, widget::Element, view};
+use crate::{config::get_config, logs, view::{self, plugin_list}, widget::Element};
 
 use super::{components, state};
 
@@ -19,7 +19,7 @@ use super::{components, state};
 pub struct Dashboard {
   pub(super) is_developer: bool,
   pub(super) plugins: HashMap<String, Plugin>,
-  pub(super) view: Option<View>,
+  pub(super) view: View,
   pub(super) logs: logs::state::Logs,
   pub(super) dialog: Option<Dialog>,
 }
@@ -35,19 +35,19 @@ pub enum Dialog {
 pub enum View{
   Logs(view::logs::Logs),
   Plugin(view::plugin::Plugin),
+  PluginList(view::plugin_list::PluginList)
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-  ToPlugins,
+  ToPluginList,
+  PluginList(view::plugin_list::Message),
+  #[allow(unused)]
   ToSettings,
   ToLogs,
   Logs(view::logs::Message),
-  ToPlugin(String),
   Plugin(view::plugin::Message),
-  Enable(String),
   EnableResponse(Result<(), String>),
-  Disable(String),
   DisableResponse(Result<(), String>),
   #[allow(unused)]
   Reload(String),
@@ -60,8 +60,6 @@ pub enum Message {
   LogEvent(logs::subscriber::Event),
   GetPluginsResponse(Result<HashMap<String, Plugin>, String>),
   ResetView,
-  StartInstallation,
-  StartDevelopmentInstallation,
   OpenInstallConfirmationPromptDialog(Result<InstallConfirmationPrompt, String>),
   ConfirmInstallation(InstallConfirmationPrompt),
   InstallResponse(Result<(), String>),
@@ -83,7 +81,7 @@ impl Dashboard {
     Dashboard {
       is_developer,
       plugins,
-      view: None,
+      view: View::PluginList(plugin_list::PluginList::new()),
       logs: logs::state::Logs::default(),
       dialog: None,
     }

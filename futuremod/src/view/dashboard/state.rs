@@ -15,12 +15,14 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
       *dashboard = Dashboard::new(plugins, dashboard.is_developer);
       return Task::none();
     },
-    Message::Enable(plugin) | Message::Plugin(view::plugin::Message::Enable(plugin)) => {
+    Message::Plugin(view::plugin::Message::Enable(plugin)) |
+    Message::PluginList(view::plugin_list::Message::Enable(plugin)) => {
       return Task::perform(async move {
         api::enable_plugin(plugin).await.map_err(|e| e.to_string())
       }, Message::EnableResponse);
     },
-    Message::Disable(plugin) | Message::Plugin(view::plugin::Message::Disable(plugin)) => {
+    Message::Plugin(view::plugin::Message::Disable(plugin)) |
+    Message::PluginList(view::plugin_list::Message::Disable(plugin)) => {
       return Task::perform(async {
         api::disable_plugin(plugin).await.map_err(|e| e.to_string())
       }, Message::DisableResponse);
@@ -57,7 +59,8 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
         }
       }
     },
-    Message::UninstallPrompt(plugin_name) | Message::Plugin(view::plugin::Message::UninstallPrompt(plugin_name)) => {
+    Message::UninstallPrompt(plugin_name) |
+    Message::Plugin(view::plugin::Message::UninstallPrompt(plugin_name)) => {
       dashboard.dialog = Some(Dialog::UninstallPrompt(plugin_name));
     },
     Message::Uninstall(name) => {
@@ -67,9 +70,15 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
       match response {
         Ok(()) => {
           // Navigate back to plugin list
-          dashboard.view = None;
-          dashboard.dialog = None;
           return Task::perform(get_plugins(), Message::GetPluginsResponse)
+            .chain(
+              Task::batch(
+                [
+                    Task::done(Message::CloseDialog),
+                    Task::done(Message::ToPluginList)
+                  ]
+                )
+            );
         },
         Err(e) => {
           warn!("Could not uninstall error: {}", e);
@@ -89,10 +98,10 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
         },
       }
     }
-    Message::ToPlugins => {
-      dashboard.view = None;
+    Message::ToPluginList => {
+      dashboard.view = View::PluginList(view::plugin_list::PluginList::new());
     },
-    Message::StartInstallation => {
+    Message::PluginList(view::plugin_list::Message::Install) => {
       let plugin_package = match FileDialog::new()
         .set_title("Select the Plugin Package to install")
         .add_filter("Plugin Package", &["zip"])
@@ -113,7 +122,7 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
         })
       }, Message::OpenInstallConfirmationPromptDialog);
     },
-    Message::StartDevelopmentInstallation => {
+    Message::PluginList(view::plugin_list::Message::DevInstall) => {
       let plugin_package = match FileDialog::new()
         .set_title("Select the Plugin Directory to install in development mode")
         .pick_folder() {
@@ -191,15 +200,15 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
     Message::ToLogs => {
       let (logs_view, logs_message) = logs::Logs::new();
 
-      dashboard.view = Some(View::Logs(logs_view));
+      dashboard.view = View::Logs(logs_view);
 
       return logs_message.map(Message::Logs);
     },
-    Message::ToPlugin(name) => {
+    Message::PluginList(view::plugin_list::Message::ToPlugin(name)) => {
       let plugin = dashboard.plugins.get(&name);
       match plugin {
         Some(_) => {
-          dashboard.view = Some(View::Plugin(view::plugin::Plugin::new(name.clone())));
+          dashboard.view = View::Plugin(view::plugin::Plugin::new(name.clone()));
         },
         None => {
         }
@@ -207,26 +216,27 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
     },
     // Message decision tree based on view state
     message => match &mut dashboard.view {
-      Some(view) => match view {
-        View::Logs(logs_view) => match message {
-          Message::Logs(logs_message) => match logs_message {
-            other_logs_message => {
-              return logs_view.update(other_logs_message).map(Message::Logs)
-            },
+      View::Logs(logs_view) => match message {
+        Message::Logs(logs_message) => match logs_message {
+          other_logs_message => {
+            return logs_view.update(other_logs_message).map(Message::Logs)
           },
+        },
+        _ => (),
+      },
+      View::Plugin(_) => match message {
+        Message::Plugin(plugin_message) => match plugin_message {
+          view::plugin::Message::GoBack => {
+            return Task::done(Message::ToPluginList);
+          }
           _ => (),
         },
-        View::Plugin(_) => match message {
-          Message::Plugin(plugin_message) => match plugin_message {
-            view::plugin::Message::GoBack => {
-              dashboard.view = None;
-            }
-            _ => (),
-          },
-          _ => (),
-        }
+        _ => (),
       },
-      _ => (),
+      View::PluginList(plugin_list_view) => match message {
+        Message::PluginList(plugin_list_message) => return plugin_list_view.update(plugin_list_message).map(Message::PluginList),
+        _ => (),
+      }
     },
   }
 
