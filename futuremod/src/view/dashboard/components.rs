@@ -399,10 +399,8 @@ fn installation_prompt<'a>(confirmation_prompt: &InstallConfirmationPrompt) -> E
           .align_y(Alignment::End)
           .spacing(8.0)
           .width(Length::Fill)
-          .height(Length::Fixed(60.0))
       ]
     )
-      .height(Length::Shrink)
       .max_width(800.0)
       .class(Container::Dialog)
       .padding(16.0)
