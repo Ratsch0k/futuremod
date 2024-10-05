@@ -37,7 +37,8 @@ pub enum Dialog {
 pub enum View{
   Logs(view::logs::Logs),
   Plugin(view::plugin::Plugin),
-  PluginList(view::plugin_list::PluginList)
+  PluginList(view::plugin_list::PluginList),
+  Settings(view::settings::Settings),
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +47,7 @@ pub enum Message {
   PluginList(view::plugin_list::Message),
   #[allow(unused)]
   ToSettings,
+  Settings(view::settings::Message),
   ToLogs,
   Logs(view::logs::Message),
   Plugin(view::plugin::Message),

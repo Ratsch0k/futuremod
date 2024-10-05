@@ -219,6 +219,9 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
     Message::ToggleSidebar => {
       dashboard.sidebar_minimized.transition(!dashboard.sidebar_minimized.value, Instant::now());
     },
+    Message::ToSettings => {
+      dashboard.view = View::Settings(view::settings::Settings::new());
+    }
     // Message decision tree based on view state
     message => match &mut dashboard.view {
       View::Logs(logs_view) => match message {
@@ -240,6 +243,10 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
       },
       View::PluginList(plugin_list_view) => match message {
         Message::PluginList(plugin_list_message) => return plugin_list_view.update(plugin_list_message).map(Message::PluginList),
+        _ => (),
+      },
+      View::Settings(settings_view) => match message {
+        Message::Settings(settings_message) => return settings_view.update(settings_message).map(Message::Settings),
         _ => (),
       }
     },

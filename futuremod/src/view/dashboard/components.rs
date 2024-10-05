@@ -20,6 +20,7 @@ pub fn dashboard<'a>(state: &'a Dashboard) -> Element<'a, Message> {
     },
     View::PluginList(plugin_list_view) => plugin_list_view.view(&state.plugins, state.is_developer)
       .map(Message::PluginList),
+    View::Settings(settings_view) => settings_view.view().map(Message::Settings),
   };
 
   let underlay: Element<Message> = column![
@@ -179,7 +180,7 @@ fn tabs<'a>(active_view: &View, minimized: &Animated<bool, Instant>) -> Element<
     tab_button(Bootstrap::Box, "Plugins", Some(Message::ToPluginList), is_plugin_tab(&active_view)),
     tab_button(Bootstrap::CardText, "Logs", Some(Message::ToLogs), matches!(active_view, View::Logs(_))),
     Space::with_height(Length::Fill),
-    tab_button(Bootstrap::Gear, "Settings", None, false),
+    tab_button(Bootstrap::Gear, "Settings", Some(Message::ToSettings), false),
   ]
     .spacing(8.0)
     .into()
