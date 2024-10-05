@@ -1,4 +1,5 @@
 pub mod loading;
-pub mod main;
-pub mod plugins;
 pub mod logs;
+pub mod dashboard;
+pub mod plugin;
+pub mod plugin_list;

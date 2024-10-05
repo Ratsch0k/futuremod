@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use async_tungstenite::{WebSocketStream, tungstenite};
-use iced::{subscription::{self, Subscription}, futures::{channel::mpsc, self}};
-use futures::sink::SinkExt;
+use iced::{futures::{self, channel::mpsc}, stream};
+use futures::{sink::SinkExt, Stream};
 use futures::stream::StreamExt;
 use log::*;
 use serde::{Serialize, Deserialize};
@@ -33,11 +33,8 @@ pub struct LogRecord {
     pub plugin: Option<String>
 }
 
-pub fn connect(base_address: String) -> Subscription<Event> {
-    struct Connect;
-
-    subscription::channel(
-        std::any::TypeId::of::<Connect>(),
+pub fn connect(base_address: String) -> impl Stream<Item = Event> {
+    stream::channel(
         100,
         |mut output| async move {
             let mut state = State::Disconnected;

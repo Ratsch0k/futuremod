@@ -1,5 +1,6 @@
-use std::{path::{Path, PathBuf}, time::{Duration, SystemTime}};
-use iced::{widget::{column, container, row, text, Column}, Alignment, Command, Length, Padding};
+use std::{collections::HashMap, path::{Path, PathBuf}, time::{Duration, SystemTime}};
+use futuremod_data::plugin::Plugin;
+use iced::{widget::{column, container, row, text, Column}, Alignment, Task, Length, Padding};
 use log::*;
 use rfd::FileDialog;
 
@@ -23,6 +24,8 @@ pub enum Loading {
   /// This variant keeps track of the time when the mod was injected in this injection
   /// attempt and how many attempts were already made.
   WaitingForMod{since: SystemTime, injection_attempts: u8, mod_path: PathBuf},
+  FetchingPlugins,
+  FetchingPluginError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -30,20 +33,22 @@ pub enum Message {
   OpenPathSelection,
   CheckIfStarted,
   IsModActive(bool),
+  PluginResponse(Result<HashMap<String, Plugin>, String>),
+  GotPlugins(HashMap<String, Plugin>)
 }
 
 impl Loading {
-  pub fn new() -> (Self, Command<Message>) {
+  pub fn new() -> (Self, Task<Message>) {
     let mod_path = Path::new(&get_config().mod_path).to_path_buf();
 
     match mod_path.exists() {
       true => {
         info!("found mod file, checking if mode is active");
-        (Loading::WaitingForProgram{mod_path}, Command::perform(async {}, |_| Message::CheckIfStarted))
+        (Loading::WaitingForProgram{mod_path}, Task::perform(async {}, |_| Message::CheckIfStarted))
       }
       false => {
         info!("didn't found mod file, requesting user to select one");
-        (Loading::NoPath, Command::none())
+        (Loading::NoPath, Task::none())
       }
     }
   }
@@ -56,7 +61,7 @@ impl Loading {
             .size(24),
           container(
             text(mod_path.to_str().unwrap_or("error parsing mod path"))
-          ).padding(Padding::from([0, 0, 8, 0])),
+          ).padding(Padding{top: 0.0, left: 0.0, bottom: 8.0, right: 0.0}),
           button("Change Mod")
             .on_press(Message::OpenPathSelection)
         ].into()
@@ -78,6 +83,12 @@ impl Loading {
           button("SELECT")
             .on_press(Message::OpenPathSelection),
         ].into()
+      },
+      Loading::FetchingPlugins => {
+        column![text("Fetching plugins")].into()
+      },
+      Loading::FetchingPluginError(e) => {
+        column![text(format!("Error while fetching plugins: {}", e))].into()
       }
     };
 
@@ -85,15 +96,15 @@ impl Loading {
       row![
         content
           .spacing(4)
-          .align_items(Alignment::Center)
+          .align_x(Alignment::Center)
           .width(Length::Fill)
       ]
       .height(Length::Fill)
-      .align_items(Alignment::Center)
+      .align_y(Alignment::Center)
     ).into();
 }
 
-  pub fn update(&mut self, msg: Message) -> Command<Message> {
+  pub fn update(&mut self, msg: Message) -> Task<Message> {
     match self {
       Loading::WaitingForProgram { mod_path } => match msg {
         Message::CheckIfStarted => {
@@ -116,7 +127,9 @@ impl Loading {
       Loading::WaitingForMod{since, injection_attempts: injection_tries, mod_path} => match msg {
         Message::IsModActive(is_active) => match is_active {
           true => {
-            error!("Loading view should never receive Message::IsModActive(true)")
+            *self = Loading::FetchingPlugins;
+
+            return Task::perform(async {api::get_plugins().await.map_err(|e| e.to_string())}, Message::PluginResponse);
           },
           false => {
             // Check how much time has passed since waiting for the mod
@@ -128,7 +141,7 @@ impl Loading {
               if *injection_tries >= MAX_INJECTION_TRIES {
                 warn!("Was never able to successfully inject the mod. Showing error");
                 *self = Loading::InjectionError { mod_path: mod_path.clone().to_path_buf(), error: String::from("Was not able to inject the mod") };
-                return Command::none();
+                return Task::none();
               }
             // If there are still some injection tries left and a timeout occurred, try injecting the mod again.
               info!("Already waiting for the mod for over 5 seconds. Something went wrong. Retrying to inject mod.");
@@ -140,7 +153,7 @@ impl Loading {
             // Check if the mod is active
             info!("Checking if mod is active");
 
-            return Command::perform(
+            return Task::perform(
               async {
                 tokio::time::sleep(Duration::from_millis(500)).await;
 
@@ -155,13 +168,25 @@ impl Loading {
       Loading::NoPath => match msg {
         Message::OpenPathSelection => return self.pick_mod_path(),
         _ => (),
-      }
+      },
+      Loading::FetchingPlugins => match msg {
+        Message::PluginResponse(response) => match response {
+          Ok(plugins) => {
+            return Task::perform(async {plugins}, Message::GotPlugins);
+          },
+          Err(e) => {
+            *self = Loading::FetchingPluginError(e);
+          }
+        },
+        _ => (),
+      },
+      _ => (),
     }
 
-    Command::none()
+    Task::none()
   }
 
-  fn pick_mod_path(&mut self) -> Command<Message> {
+  fn pick_mod_path(&mut self) -> Task<Message> {
     info!("Prompting user to pick the mod file");
     match FileDialog::new().set_directory(".").pick_file() {
       Some(path) => {
@@ -171,11 +196,11 @@ impl Loading {
 
         check_if_mod_running()
       },
-      None => Command::none()
+      None => Task::none()
     }
   }
 
-  fn try_to_inject_mod(&mut self, mod_path: PathBuf) -> Command<Message> {
+  fn try_to_inject_mod(&mut self, mod_path: PathBuf) -> Task<Message> {
     info!("Trying to inject mod");
     let config = get_config();
 
@@ -191,7 +216,7 @@ impl Loading {
                 error: format!("Could not inject the mod: {}", e).to_string(),
                 mod_path,
               };
-              return Command::none();
+              return Task::none();
             },
             Ok(_) => {
               info!("Successfully injected mod");
@@ -210,10 +235,10 @@ impl Loading {
     }
 
     info!("Injection not successful, trying again in 100ms");
-    return Command::perform(async {tokio::time::sleep(Duration::from_millis(100))}, |_| Message::CheckIfStarted);
+    return Task::perform(async {tokio::time::sleep(Duration::from_millis(100))}, |_| Message::CheckIfStarted);
   }
 }
 
-fn check_if_mod_running() -> Command<Message> {
-  Command::perform(is_mod_running(), Message::IsModActive)
+fn check_if_mod_running() -> Task<Message> {
+  Task::perform(is_mod_running(), Message::IsModActive)
 }

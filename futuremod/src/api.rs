@@ -176,3 +176,47 @@ pub async fn get_plugins() -> Result<HashMap<String, Plugin>, String> {
 
   parse_json(response).await
 }
+
+pub async fn enable_plugin(name: String) -> Result<(), anyhow::Error> {
+  let mut body = HashMap::new();
+  body.insert("name", name.clone());
+
+  let response = reqwest::Client::new()
+    .put(build_url("/plugin/enable"))
+    .json(&body)
+    .send()
+    .await
+    .map_err(|e| anyhow!("Could not send request to enable the plugin: {}", e))?;
+
+  if !response.status().is_success() {
+    let response_text = response.text()
+      .await
+      .map_err(|e| anyhow!("Could not get response content: {}", e))?;
+
+    bail!("{}", response_text)
+  }
+
+  Ok(())
+}
+
+pub async fn disable_plugin(name: String) -> Result<(), anyhow::Error> {
+  let mut body = HashMap::new();
+  body.insert("name", name.clone());
+
+  let response = reqwest::Client::new()
+    .put(build_url("/plugin/disable"))
+    .json(&body)
+    .send()
+    .await
+    .map_err(|e| anyhow!("Could not send request to disable plugin: {}", e))?;
+
+  if !response.status().is_success() {
+    let response_text = response.text()
+      .await
+      .map_err(|e| anyhow!("Could not get response content: {}", e))?;
+
+    bail!("{}", response_text)
+  }
+
+  Ok(())
+}

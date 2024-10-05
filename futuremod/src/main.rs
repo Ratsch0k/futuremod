@@ -1,21 +1,21 @@
 use std::{io, str::FromStr, time::SystemTime};
 use fern::colors::{ColoredLevelConfig, Color};
-use gui::Flags;
+use iced_fonts::BOOTSTRAP_FONT_BYTES;
 use log::*;
 use clap::Parser;
 use clap::builder::TypedValueParser as _;
-use iced::{window, Application, Settings, Size};
+use iced::Size;
 
 mod gui;
 mod config;
 mod view;
 mod api;
 mod injector;
-mod log_subscriber;
 mod theme;
 mod widget;
 mod util;
 mod palette;
+mod logs;
 
 
 #[derive(Parser)]
@@ -81,16 +81,11 @@ fn main() -> iced::Result {
         info!("Starting application");
     }
 
-    gui::ModInjector::run(
-        Settings {
-            window: window::Settings {
-                size: Size::new(1024.0, 800.0),
-                ..window::Settings::default()
-            },
-            flags: Flags {
-                is_developer: args.developer,
-            },
-            ..Settings::default()
-        }
-    )
+    iced::application::<gui::ModInjector, gui::Message, crate::theme::Theme, iced::Renderer>(gui::title, gui::update, gui::view)
+        .subscription(gui::subscription)
+        .theme(gui::theme)
+        .window_size(Size::new(1024.0, 800.0))
+        .font(BOOTSTRAP_FONT_BYTES)
+        .antialiasing(true)
+        .run_with(move || gui::ModInjector::new(args.developer))
 }
