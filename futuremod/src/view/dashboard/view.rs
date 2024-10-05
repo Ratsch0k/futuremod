@@ -4,7 +4,7 @@ use futuremod_data::plugin::{Plugin, PluginInfo};
 use iced::{window::frames, Subscription, Task};
 use lilt::{Animated, Easing};
 
-use crate::{config::get_config, logs, view::{self, plugin_list}, widget::Element};
+use crate::{config, logs, view::{self, plugin_list}, widget::Element};
 
 use super::{components, state};
 
@@ -101,7 +101,7 @@ impl Dashboard {
   }
 
   pub fn subscription(&self) -> Subscription<Message> {
-    let config = get_config();
+    let config = config::get();
     
     Subscription::batch([
       Subscription::run_with_id("log_websocket", crate::logs::subscriber::connect(config.mod_address.clone())).map(Message::LogEvent),

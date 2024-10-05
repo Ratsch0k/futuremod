@@ -1,10 +1,11 @@
 use std::{collections::HashMap, path::{Path, PathBuf}, time::{Duration, SystemTime}};
 use futuremod_data::plugin::Plugin;
-use iced::{widget::{column, container, row, text, Column}, Alignment, Task, Length, Padding};
+use iced::{widget::{column, container, row, text, Column}, Alignment, Length, Padding, Task};
+use iced_fonts::Bootstrap;
 use log::*;
 use rfd::FileDialog;
 
-use crate::{api::{self, is_mod_running}, config::get_config, injector::{get_future_cop_handle, inject_mod}, theme, widget::{button, Element}};
+use crate::{api::{self, is_mod_running}, config, injector::{get_future_cop_handle, inject_mod}, theme, widget::{button, icon_with_size, Element}};
 
 const MAX_INJECTION_TRIES: u8 = 3;
 const INJECTION_WAIT_TIMEOUT_SECONDS: u64 = 5;
@@ -14,7 +15,7 @@ const INJECTION_WAIT_TIMEOUT_SECONDS: u64 = 5;
 #[derive(Debug)]
 pub enum Loading {
   NoPath,
-  WaitingForProgram{mod_path: PathBuf},
+  WaitingForProgram{mod_path: PathBuf, error: Option<String>},
   InjectionError{mod_path: PathBuf, error: String},
   /// State while waiting for the injected mod to start.
   /// 
@@ -31,6 +32,7 @@ pub enum Loading {
 #[derive(Debug, Clone)]
 pub enum Message {
   OpenPathSelection,
+  ChangeModPath(PathBuf),
   CheckIfStarted,
   IsModActive(bool),
   PluginResponse(Result<HashMap<String, Plugin>, String>),
@@ -39,12 +41,14 @@ pub enum Message {
 
 impl Loading {
   pub fn new() -> (Self, Task<Message>) {
-    let mod_path = Path::new(&get_config().mod_path).to_path_buf();
+    let config = config::get();
+
+    let mod_path = Path::new(&config.mod_path).to_path_buf();
 
     match mod_path.exists() {
       true => {
         info!("found mod file, checking if mode is active");
-        (Loading::WaitingForProgram{mod_path}, Task::perform(async {}, |_| Message::CheckIfStarted))
+        (Loading::WaitingForProgram{mod_path, error: None}, Task::perform(async {}, |_| Message::CheckIfStarted))
       }
       false => {
         info!("didn't found mod file, requesting user to select one");
@@ -55,7 +59,22 @@ impl Loading {
 
   pub fn view(&self) -> Element<Message> {
     let content: Column<Message, theme::Theme> = match self {
-      Loading::WaitingForProgram{mod_path} => {
+      Loading::WaitingForProgram{mod_path, error } => {
+        let error_message = error.as_ref().map(|e| 
+          container(
+            container(
+              column![
+                row![icon_with_size(Bootstrap::ExclamationTriangle, 20), text("Error").size(20)].spacing(8),
+                text(e),
+              ]
+                .spacing(8)
+            )
+              .class(theme::Container::Danger)
+              .padding(16)
+          )
+            .padding(Padding::default().top(32))
+        );
+
         column![
           text("Waiting for program to start")
             .size(24),
@@ -63,8 +82,10 @@ impl Loading {
             text(mod_path.to_str().unwrap_or("error parsing mod path"))
           ).padding(Padding{top: 0.0, left: 0.0, bottom: 8.0, right: 0.0}),
           button("Change Mod")
-            .on_press(Message::OpenPathSelection)
-        ].into()
+            .on_press(Message::OpenPathSelection),
+        ]
+          .push_maybe(error_message)
+          .into()
       },
       Loading::WaitingForMod{..} => {
         column![text("Waiting for mod to start...")].into()
@@ -106,7 +127,7 @@ impl Loading {
 
   pub fn update(&mut self, msg: Message) -> Task<Message> {
     match self {
-      Loading::WaitingForProgram { mod_path } => match msg {
+      Loading::WaitingForProgram { mod_path, error } => match msg {
         Message::CheckIfStarted => {
           info!("Check if FutureCop has started");
           let mod_path = mod_path.clone();
@@ -114,6 +135,26 @@ impl Loading {
           return self.try_to_inject_mod(mod_path);
         },
         Message::OpenPathSelection => return self.pick_mod_path(),
+        Message::ChangeModPath(path) => {
+          let path_str = match path.to_str(){
+            Some(v) => v.to_string(),
+            None => {
+              *error = Some(String::from("Invalid path. Please select another file."));
+              return Task::none();
+            }
+          };
+
+          if let Err(e) = config::update(move |config| {
+            config.mod_path = path_str.clone();
+          }) {
+            *error = Some(e.to_string());
+            return Task::none();
+          }
+
+          *error = None;
+
+          *self = Loading::WaitingForProgram { mod_path: path, error: None };
+        },
         _ => (),
       },
       Loading::InjectionError{mod_path, ..} => match msg {
@@ -192,9 +233,7 @@ impl Loading {
       Some(path) => {
         info!("Changing mod path to: {}", path.to_str().unwrap());
 
-        *self = Loading::WaitingForProgram { mod_path: path };
-
-        check_if_mod_running()
+        Task::done(Message::ChangeModPath(path))
       },
       None => Task::none()
     }
@@ -202,7 +241,7 @@ impl Loading {
 
   fn try_to_inject_mod(&mut self, mod_path: PathBuf) -> Task<Message> {
     info!("Trying to inject mod");
-    let config = get_config();
+    let config = config::get();
 
     info!("Getting handle to FutureCop process");
     match get_future_cop_handle(config.require_admin) {
