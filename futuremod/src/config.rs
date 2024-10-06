@@ -1,8 +1,7 @@
-use std::{env, fs, path::Path};
+use std::{env, fmt::Display, fs, io, path::{Path, PathBuf}, sync::{Arc, LazyLock, OnceLock, RwLock, RwLockReadGuard}};
 use anyhow::anyhow;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
-use tokio::sync::OnceCell;
 
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -51,9 +50,7 @@ fn default_require_admin() -> bool {
   false
 }
 
-static CONFIG: OnceCell<Config> = OnceCell::<Config>::const_new();
-
-fn create_default_config() -> Result<Config, serde_json::Error> {
+pub fn create_default_config() -> Result<Config, serde_json::Error> {
   serde_json::from_str("{}")
 }
 
@@ -87,30 +84,74 @@ fn get_config_from_path(path: &Path) -> Result<Config, anyhow::Error> {
   }
 }
 
-pub fn init(config_path_str: &str) -> Result<Config, anyhow::Error> {
+pub fn init(config_path_str: &str) -> Result<(), anyhow::Error> {
   debug!("Initializing the config from '{}'", config_path_str);
 
   let config_path = Path::new(config_path_str);
 
   let config = get_config_from_path(config_path)?;
 
-  debug!("Setting config global");
-  match CONFIG.set(config) {
-    Ok(_) => debug!("set config"),
+  debug!("Initializing global config");
+
+  let global_config = GlobalConfig {
+    path: PathBuf::from(config_path_str),
+    config: Arc::new(RwLock::new(config)),
+  };
+
+  match GLOBAL_CONFIG.set(global_config) {
+    Ok(_) => debug!("Initialized config"),
     Err(_) => {
-      debug!("didn't set config");
-      return Err(anyhow!("config is already loaded"));
-    }
+      debug!("Could not initialize config");
+      return Err(anyhow!("Config already initialized"))
+    },
   }
 
-  assert!(CONFIG.get().is_some(), "config wasn't set");
+  assert!(GLOBAL_CONFIG.get().is_some(), "Config wasn't initialized");
 
-  Ok(get_config())
+  Ok(())
 }
 
-pub fn get_config() -> Config {
-  match CONFIG.get() {
-    Some(config) => config.clone(),
-    None => panic!("config was not initialized")
-  }
+#[derive(Default, Clone, Debug)]
+pub struct GlobalConfig {
+  path: PathBuf,
+  config: Arc<RwLock<Config>>,
+}
+
+static GLOBAL_CONFIG: OnceLock<GlobalConfig> = OnceLock::new();
+pub static DEFAULT_CONFIG: LazyLock<Config> = LazyLock::new(|| create_default_config().expect("Could not create default config"));
+
+pub fn get<'a>() -> RwLockReadGuard<'a, Config> {
+  let config = GLOBAL_CONFIG.get().expect("Config not initialized");
+
+  config.config.read().expect("Cannot read config, it is locked")
+}
+
+pub enum ConfigWriteError {
+  Serialization(serde_json::Error),
+  Io(io::Error),
+}
+
+impl Display for ConfigWriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      let content = match self {
+        ConfigWriteError::Serialization(e) => format!("Could not serialize config: {}", e),
+        ConfigWriteError::Io(e) => format!("Could not write config to disk: {}", e),
+      };
+
+      f.write_str(&content)
+    }
+}
+
+pub fn update(f: impl Fn(&mut Config) -> ()) -> Result<(), ConfigWriteError> {
+  let config = GLOBAL_CONFIG.get().expect("Config not initialized");
+
+  let mut writable_config = config.config.write().expect("Cannot write to config, it is locked");
+
+  // Let the provided function update the config
+  f(&mut writable_config);
+
+  // Write the changed config to the config file
+  let config_content = serde_json::to_string::<Config>(&writable_config).map_err(ConfigWriteError::Serialization)?;
+
+  fs::write(&config.path, config_content).map_err(ConfigWriteError::Io)
 }

@@ -9,6 +9,7 @@ pub mod checkbox;
 pub mod toggler;
 pub mod badge;
 pub mod menu;
+pub mod text_input;
 
 pub use theme::Theme;
 pub use text::Text;

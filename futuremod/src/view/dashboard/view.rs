@@ -4,7 +4,7 @@ use futuremod_data::plugin::{Plugin, PluginInfo};
 use iced::{window::frames, Subscription, Task};
 use lilt::{Animated, Easing};
 
-use crate::{config::get_config, logs, view::{self, plugin_list}, widget::Element};
+use crate::{logs, view::{self, plugin_list}, widget::Element};
 
 use super::{components, state};
 
@@ -37,7 +37,8 @@ pub enum Dialog {
 pub enum View{
   Logs(view::logs::Logs),
   Plugin(view::plugin::Plugin),
-  PluginList(view::plugin_list::PluginList)
+  PluginList(view::plugin_list::PluginList),
+  Settings(view::settings::Settings),
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +47,7 @@ pub enum Message {
   PluginList(view::plugin_list::Message),
   #[allow(unused)]
   ToSettings,
+  Settings(view::settings::Message),
   ToLogs,
   Logs(view::logs::Message),
   Plugin(view::plugin::Message),
@@ -101,10 +103,8 @@ impl Dashboard {
   }
 
   pub fn subscription(&self) -> Subscription<Message> {
-    let config = get_config();
-    
     Subscription::batch([
-      Subscription::run_with_id("log_websocket", crate::logs::subscriber::connect(config.mod_address.clone())).map(Message::LogEvent),
+      Subscription::run(crate::logs::subscriber::connect).map(Message::LogEvent),
       frames().map(|_| Message::Tick),
     ])
   }

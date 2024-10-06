@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::config::get_config;
+use crate::config;
 use anyhow::{anyhow, bail};
 use log::info;
 use reqwest::Body;
@@ -12,7 +12,7 @@ use futuremod_data::plugin::{Plugin, PluginInfo};
 
 
 pub fn build_url(path: &str) -> String {
-  let config = get_config();
+  let config = config::get();
 
   format!("http://{}{}", config.mod_address, path)
 }

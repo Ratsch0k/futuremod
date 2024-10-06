@@ -19,6 +19,8 @@ pub enum Container {
 
   /// Box used as the backdrop for dialogs
   Backdrop,
+
+  Custom(Box<dyn Fn(&Theme) -> Style>)
 }
 
 impl Catalog for Theme {
@@ -33,7 +35,7 @@ impl Catalog for Theme {
     }
 }
 
-fn appearance(theme: &Theme, style: &Container) -> Style {
+pub fn appearance(theme: &Theme, style: &Container) -> Style {
   match style {
       Container::Transparent => Style::default(),
       Container::Dialog => {
@@ -94,6 +96,9 @@ fn appearance(theme: &Theme, style: &Container) -> Style {
           border: Border::default(),
           shadow: Shadow::default(),
         }
+      },
+      Container::Custom(class) => {
+        class(theme)
       }
   }
 }

@@ -4,12 +4,12 @@ use log::{debug, info};
 use windows::{core::PCSTR, Win32::{Foundation::{GetLastError, HANDLE}, Security::{GetTokenInformation, TokenElevation, TOKEN_ALL_ACCESS, TOKEN_ELEVATION}, System::{Diagnostics::{Debug::WriteProcessMemory, ToolHelp::{CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS}}, LibraryLoader::{GetModuleHandleA, GetProcAddress}, Memory::{VirtualAllocEx, MEM_COMMIT, PAGE_READWRITE}, Threading::{CreateRemoteThread, OpenProcess, OpenProcessToken, LPTHREAD_START_ROUTINE, PROCESS_ALL_ACCESS}}}};
 use anyhow::anyhow;
 
-use super::config::get_config;
+use crate::config;
 
 
 pub fn get_pid() -> Result<Option<u32>, anyhow::Error> {
   info!("Get process id of process");
-  let config = get_config();
+  let config = config::get();
 
   unsafe {
       let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)

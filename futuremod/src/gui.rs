@@ -87,11 +87,10 @@ impl ModInjector {
     pub fn new(is_developer: bool) -> (Self, Task<Message>) {
         let (loading, message) = loading::Loading::new();
 
-        // TOOD: Reenable flags
         (
             ModInjector {
                 is_developer,
-                current_view: View::Loading(loading)
+                current_view: View::Loading(loading),
             },
             message.map(Message::Loading)
         )
