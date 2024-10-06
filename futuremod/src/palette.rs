@@ -55,7 +55,7 @@ impl Default for Palette {
             text: color!(0xFAFAFA),
           },
         },
-        primary: Primary::generate(color!(0x9A47FF), BACKGROUND, color!(0xFAFAFA)),
+        primary: Primary::generate(color!(0xAE6BFF), BACKGROUND, color!(0xFAFAFA)),
         secondary: Secondary::generate(color!(0x13111F), color!(0xffffff)),
         success: ColorRange {
             lightest: Pair { color: color!(0xCDFFBA), text: color!(0x000000) },
