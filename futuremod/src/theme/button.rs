@@ -21,6 +21,7 @@ pub enum Button {
   Destructive,
   Text,
   HoverHighlight,
+  Custom(Box<dyn Fn(&Theme, Status) -> Style>)
 }
 
 impl Catalog for Theme {
@@ -30,7 +31,11 @@ impl Catalog for Theme {
         Button::Default
     }
 
-    fn style(&self, class: &Self::Class<'_>, status: iced::widget::button::Status) -> Style {
+    fn style(&self, class: &Self::Class<'_>, status: Status) -> Style {
+        if let Button::Custom(style_fn) = class {
+            return style_fn(self, status)
+        }
+
         match status {
           Status::Active => active(self, class),
             Status::Hovered => hovered(self, class),
@@ -67,7 +72,7 @@ fn active(theme: &Theme, style: &Button) -> Style {
           text_color: theme.palette.background.darkest.text,
           ..appearance
       },
-      Button::Default => from_color_range(&theme.palette.background),
+      Button::Default | _ => from_color_range(&theme.palette.background),
   }
 }
 
@@ -79,9 +84,9 @@ fn hovered(theme: &Theme, style: &Button) -> Style {
         Button::Secondary => Some(theme.palette.secondary.base.color),
         Button::Positive => Some(theme.palette.success.dark.color),
         Button::Destructive => Some(theme.palette.danger.dark.color),
-        Button::Default => Some(theme.palette.background.light.color),
         Button::Text  => Some(util::alpha(color!(0xffffff), 0.01)),
         Button::HoverHighlight => Some(theme.palette.primary.strong.color),
+        Button::Default | _ => Some(theme.palette.background.light.color),
     };
 
     Style {
