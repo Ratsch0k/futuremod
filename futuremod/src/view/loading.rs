@@ -7,6 +7,8 @@ use rfd::FileDialog;
 
 use crate::{api::{self, is_mod_running}, config, injector::{get_future_cop_handle, inject_mod}, theme, widget::{button, icon_with_size, Element}};
 
+use super::settings::{self, Settings};
+
 const MAX_INJECTION_TRIES: u8 = 3;
 const INJECTION_WAIT_TIMEOUT_SECONDS: u64 = 5;
 
@@ -15,7 +17,7 @@ const INJECTION_WAIT_TIMEOUT_SECONDS: u64 = 5;
 #[derive(Debug)]
 pub enum Loading {
   NoPath,
-  WaitingForProgram{mod_path: PathBuf, error: Option<String>},
+  WaitingForProgram{mod_path: PathBuf, error: Option<String>, settings: Option<Settings>},
   InjectionError{mod_path: PathBuf, error: String},
   /// State while waiting for the injected mod to start.
   /// 
@@ -24,7 +26,7 @@ pub enum Loading {
   /// some time. If injection tries exceed a threshold, we show an error.
   /// This variant keeps track of the time when the mod was injected in this injection
   /// attempt and how many attempts were already made.
-  WaitingForMod{since: SystemTime, injection_attempts: u8, mod_path: PathBuf},
+  WaitingForMod{since: SystemTime, injection_attempts: u8, mod_path: PathBuf, settings: Option<Settings>},
   FetchingPlugins,
   FetchingPluginError(String),
 }
@@ -36,7 +38,9 @@ pub enum Message {
   CheckIfStarted,
   IsModActive(bool),
   PluginResponse(Result<HashMap<String, Plugin>, String>),
-  GotPlugins(HashMap<String, Plugin>)
+  GotPlugins(HashMap<String, Plugin>),
+  OpenSettings,
+  Settings(settings::Message),
 }
 
 impl Loading {
@@ -48,7 +52,7 @@ impl Loading {
     match mod_path.exists() {
       true => {
         info!("found mod file, checking if mode is active");
-        (Loading::WaitingForProgram{mod_path, error: None}, Task::perform(async {}, |_| Message::CheckIfStarted))
+        (Loading::WaitingForProgram{mod_path, error: None, settings: None}, Task::perform(async {}, |_| Message::CheckIfStarted))
       }
       false => {
         info!("didn't found mod file, requesting user to select one");
@@ -59,7 +63,11 @@ impl Loading {
 
   pub fn view(&self) -> Element<Message> {
     let content: Column<Message, theme::Theme> = match self {
-      Loading::WaitingForProgram{mod_path, error } => {
+      Loading::WaitingForProgram{error , settings, ..} => {
+        if let Some(settings_view) = settings {
+          return settings_view.view().map(Message::Settings);
+        }
+
         let error_message = error.as_ref().map(|e| 
           container(
             container(
@@ -78,17 +86,25 @@ impl Loading {
         column![
           text("Waiting for program to start")
             .size(24),
-          container(
-            text(mod_path.to_str().unwrap_or("error parsing mod path"))
-          ).padding(Padding{top: 0.0, left: 0.0, bottom: 8.0, right: 0.0}),
-          button("Change Mod")
-            .on_press(Message::OpenPathSelection),
+          button("Change Settings")
+            .on_press(Message::OpenSettings),
         ]
+          .spacing(16)
           .push_maybe(error_message)
           .into()
       },
-      Loading::WaitingForMod{..} => {
-        column![text("Waiting for mod to start...")].into()
+      Loading::WaitingForMod{settings, ..} => {
+        if let Some(settings_view) = settings {
+          return settings_view.view().map(Message::Settings);
+        }
+
+        column![
+          text("Waiting for mod to start...").size(20),
+          button("Change Settings")
+            .on_press(Message::OpenSettings)
+        ]
+          .spacing(16)
+          .into()
       },
       Loading::InjectionError{error, ..} => {
         column![
@@ -127,8 +143,24 @@ impl Loading {
 
   pub fn update(&mut self, msg: Message) -> Task<Message> {
     match self {
-      Loading::WaitingForProgram { mod_path, error } => match msg {
+      Loading::WaitingForProgram { mod_path, error, settings } => match msg {
+        Message::Settings(settings_message) => {
+          if let Some(settings_view) = settings {
+            match settings_message {
+              settings::Message::GoBack => {
+                *settings = None;
+                return Task::done(Message::CheckIfStarted);
+              },
+              settings_message => return settings_view.update(settings_message).map(Message::Settings),
+            }
+          }
+        },
         Message::CheckIfStarted => {
+          // Don't do anything if settings are open
+          if settings.is_some() {
+            return Task::none();
+          }
+
           info!("Check if FutureCop has started");
           let mod_path = mod_path.clone();
 
@@ -153,8 +185,11 @@ impl Loading {
 
           *error = None;
 
-          *self = Loading::WaitingForProgram { mod_path: path, error: None };
+          *self = Loading::WaitingForProgram { mod_path: path, error: None, settings: None };
         },
+        Message::OpenSettings => {
+          *settings = Some(Settings::new().with_back_button(true));
+        }
         _ => (),
       },
       Loading::InjectionError{mod_path, ..} => match msg {
@@ -165,7 +200,21 @@ impl Loading {
         },
         _ => (),
       },
-      Loading::WaitingForMod{since, injection_attempts: injection_tries, mod_path} => match msg {
+      Loading::WaitingForMod{since, injection_attempts: injection_tries, mod_path, settings} => match msg {
+        Message::OpenSettings => {
+          *settings = Some(Settings::new().with_back_button(true));
+        },
+        Message::Settings(settings_message) => {
+          if let Some(settings_view) = settings {
+            match settings_message {
+              settings::Message::GoBack => {
+                *settings = None;
+                return Task::done(Message::IsModActive(false));
+              },
+              settings_message => return settings_view.update(settings_message).map(Message::Settings),
+            }
+          }
+        }
         Message::IsModActive(is_active) => match is_active {
           true => {
             *self = Loading::FetchingPlugins;
@@ -173,6 +222,11 @@ impl Loading {
             return Task::perform(async {api::get_plugins().await.map_err(|e| e.to_string())}, Message::PluginResponse);
           },
           false => {
+            // Don't do anything if the settings are open
+            if settings.is_some() {
+              return Task::none();
+            }
+
             // Check how much time has passed since waiting for the mod
             let now = SystemTime::now();
 
@@ -187,7 +241,7 @@ impl Loading {
             // If there are still some injection tries left and a timeout occurred, try injecting the mod again.
               info!("Already waiting for the mod for over 5 seconds. Something went wrong. Retrying to inject mod.");
               let mod_path = mod_path.clone().to_path_buf();
-              *self = Loading::WaitingForMod { since: SystemTime::now(), injection_attempts: *injection_tries + 1, mod_path: mod_path.clone() };
+              *self = Loading::WaitingForMod { since: SystemTime::now(), injection_attempts: *injection_tries + 1, mod_path: mod_path.clone(), settings: settings.clone() };
               return self.try_to_inject_mod(mod_path.clone());
             }
 
@@ -259,7 +313,7 @@ impl Loading {
             },
             Ok(_) => {
               info!("Successfully injected mod");
-              *self = Loading::WaitingForMod{since: SystemTime::now(), injection_attempts: 0, mod_path};
+              *self = Loading::WaitingForMod{since: SystemTime::now(), injection_attempts: 0, mod_path, settings: None};
               return check_if_mod_running();
             }
           }

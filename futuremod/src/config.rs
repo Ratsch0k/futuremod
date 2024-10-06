@@ -1,4 +1,4 @@
-use std::{env, fmt::Display, fs, io, path::{Path, PathBuf}, sync::{Arc, OnceLock, RwLock, RwLockReadGuard}};
+use std::{env, fmt::Display, fs, io, path::{Path, PathBuf}, sync::{Arc, LazyLock, OnceLock, RwLock, RwLockReadGuard}};
 use anyhow::anyhow;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ fn default_require_admin() -> bool {
   false
 }
 
-fn create_default_config() -> Result<Config, serde_json::Error> {
+pub fn create_default_config() -> Result<Config, serde_json::Error> {
   serde_json::from_str("{}")
 }
 
@@ -111,13 +111,14 @@ pub fn init(config_path_str: &str) -> Result<(), anyhow::Error> {
   Ok(())
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct GlobalConfig {
   path: PathBuf,
   config: Arc<RwLock<Config>>,
 }
 
 static GLOBAL_CONFIG: OnceLock<GlobalConfig> = OnceLock::new();
+pub static DEFAULT_CONFIG: LazyLock<Config> = LazyLock::new(|| create_default_config().expect("Could not create default config"));
 
 pub fn get<'a>() -> RwLockReadGuard<'a, Config> {
   let config = GLOBAL_CONFIG.get().expect("Config not initialized");
@@ -148,7 +149,7 @@ pub fn update(f: impl Fn(&mut Config) -> ()) -> Result<(), ConfigWriteError> {
 
   // Let the provided function update the config
   f(&mut writable_config);
-  
+
   // Write the changed config to the config file
   let config_content = serde_json::to_string::<Config>(&writable_config).map_err(ConfigWriteError::Serialization)?;
 

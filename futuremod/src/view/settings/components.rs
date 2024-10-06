@@ -1,7 +1,7 @@
-use iced::{alignment::Vertical, border::Radius, widget::{button, column, container, row, text, text_input, toggler, Space}, Border, Length};
+use iced::{alignment::{Horizontal, Vertical}, border::Radius, widget::{button, column, container, row, text, text_input, toggler, Space}, Border, Length};
 use iced_fonts::Bootstrap;
 
-use crate::{config::Config, theme, widget::{icon_button, icon_with_size, Element}};
+use crate::{config::{Config, DEFAULT_CONFIG}, theme, widget::{icon_button, icon_with_size, Element}};
 
 use super::{Message, Settings};
 
@@ -10,7 +10,7 @@ pub fn settings_overview<'a>(settings: &'a Settings, config: Config) -> Element<
     .push_maybe(settings.error.as_ref().map(|e| error_box(e)))
     .push(settings_content(&settings))
     .padding(16)
-    .spacing(16)
+    .spacing(32)
     .into()
 }
 
@@ -39,15 +39,24 @@ fn error_box<'a>(error: &'a String) -> Element<'a, Message> {
 
 fn settings_heading<'a>(settings: &'a Settings, config: &Config) -> Element<'a, Message> {
   let settings_changed = settings != config;
+  let settings_not_default = *settings != *DEFAULT_CONFIG;
 
   column![
     row![
       text("Settings").size(24),
       Space::with_width(Length::Fill),
-      row![
-        button("Reset")
+      row![]
+        .push_maybe(if settings.back_button {
+          Some(button("Go Back").on_press(Message::GoBack))
+        } else {
+          None
+        })
+        .push(button("Reset to Defaults")
+          .on_press_maybe(if settings_not_default {Some(Message::ResetToDefaults)} else {None}))
+        .push(button("Reset")
           .on_press_maybe(if settings_changed {Some(Message::Reset)} else {None}),
-        button("Save")
+        )
+        .push(button("Save")
           .class(if settings != config {
             theme::Button::Primary
           } else {
@@ -57,13 +66,14 @@ fn settings_heading<'a>(settings: &'a Settings, config: &Config) -> Element<'a, 
             Some(Message::SaveChanges)
           } else {
             None
-          }),
-      ]
+          })
+        )
           .spacing(8.0)
     ]
       .align_y(Vertical::Center),
-    text("Configure the settings of FutureMod. For settings to take effect, FutureMod must be restarted."),
+    text("Configure the settings of FutureMod. Changing the settings takes immediate effect after clicking \"Save\". Reset current changes by clicking \"Reset\". To restore the settings to their default values click \"Reset to Defaults\"."),
   ]
+    .spacing(8)
     .into()
 }
 
@@ -90,7 +100,7 @@ fn settings_content<'a>(settings: &'a Settings) -> Element<'a, Message> {
             },
             ..theme::container::appearance(theme, &theme::Container::Box)
           }))),
-        button("Select")
+        button(text("Select").align_x(Horizontal::Center).align_y(Vertical::Center))
           .height(36)
           .width(100)
           .on_press(Message::SelectModPath)

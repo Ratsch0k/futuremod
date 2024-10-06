@@ -8,6 +8,8 @@ use log::*;
 use serde::{Serialize, Deserialize};
 use tokio::time::Instant;
 
+use crate::config;
+
 
 const BUFFER_TIME: usize = 100;
 
@@ -33,7 +35,10 @@ pub struct LogRecord {
     pub plugin: Option<String>
 }
 
-pub fn connect(base_address: String) -> impl Stream<Item = Event> {
+pub fn connect() -> impl Stream<Item = Event> {
+    let config = config::get();
+    let base_address = config.mod_address.clone();
+
     stream::channel(
         100,
         |mut output| async move {

@@ -11,6 +11,7 @@ pub struct Settings {
   pub(super) process_name: String,
   pub(super) require_admin: bool,
   pub(super) error: Option<String>,
+  pub(super) back_button: bool,
 }
 
 impl PartialEq<Config> for Settings {
@@ -30,6 +31,8 @@ pub enum Message {
   SaveChanges,
   SetError(String),
   ClearError,
+  GoBack,
+  ResetToDefaults,
 }
 
 impl Settings {
@@ -41,8 +44,14 @@ impl Settings {
       mod_address: config.mod_address.clone(),
       process_name: config.process_name.clone(),
       require_admin: config.require_admin,
-      error: Some("Test error".into()),
+      error: None,
+      back_button: false,
     }
+  }
+
+  pub fn with_back_button(mut self, value: bool) -> Self {
+    self.back_button = value;
+    self
   }
 
   pub fn update(&mut self, message: Message) -> Task<Message> {

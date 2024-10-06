@@ -13,6 +13,9 @@ pub fn update(settings: &mut Settings, message: Message) -> Task<Message> {
     Message::SaveChanges => {
       if let Err(e) = config::update(|config| {
         config.mod_path = settings.mod_path.clone();
+        config.mod_address = settings.mod_address.clone();
+        config.process_name = settings.process_name.clone();
+        config.require_admin = settings.require_admin.clone();
       }) {
         return Task::done(Message::SetError(e.to_string()));
       }
@@ -32,6 +35,7 @@ pub fn update(settings: &mut Settings, message: Message) -> Task<Message> {
     Message::SetError(error) => {
       settings.error = Some(error);
     },
+    Message::GoBack => (),
     Message::SelectModPath => {
       return match FileDialog::new()
         .add_filter("FutureMod engine", &["dll"])
@@ -53,6 +57,22 @@ pub fn update(settings: &mut Settings, message: Message) -> Task<Message> {
       settings.mod_path = config.mod_path.clone();
       settings.process_name = config.process_name.clone();
       settings.require_admin = config.require_admin.clone();
+    },
+    Message::ResetToDefaults => {
+      match config::create_default_config() {
+        Ok(default_config) => {
+          settings.error = None;
+          settings.mod_address = default_config.mod_address;
+          settings.mod_path = default_config.mod_path;
+          settings.process_name = default_config.process_name;
+          settings.require_admin = default_config.require_admin;
+
+          return Task::done(Message::SaveChanges);
+        },
+        Err(e) => {
+          return Task::done(Message::SetError(format!("Could not get default config: {}", e)));
+        }
+      }
     }
   }
 
