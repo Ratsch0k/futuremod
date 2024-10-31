@@ -1,8 +1,8 @@
 use futuremod_data::plugin::{Plugin, PluginDependency, PluginState};
-use iced::{widget::{column, container, row, rule, text, Scrollable, Toggler}, Alignment, Length, Padding};
+use iced::{widget::{column, container, markdown, row, rule, text, Scrollable, Toggler}, Alignment, Length, Padding};
 use iced_fonts::Bootstrap;
 
-use crate::{theme::{self, Button}, widget::{button, icon, icon_text_button, icon_text_button_advanced, Column, Element, IconTextButtonOptions, Row}};
+use crate::{palette::{BaseColor, Shade}, theme::{self, Button, Container, Text}, widget::{bold, button, icon, icon_text_button, icon_text_button_advanced, Column, Element, IconTextButtonOptions, Row}};
 
 use super::Message;
 
@@ -36,7 +36,7 @@ fn plugin_uninstall_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
   .into()
 }
 
-pub fn plugin_details_view<'a>(plugin: &Plugin, show_reload_success_msg: bool) -> Element<'a, Message> {
+pub fn plugin_details_view<'a>(plugin_view: &'a super::Plugin, plugin: &Plugin, show_reload_success_msg: bool) -> Element<'a, Message> {
   let reload_success_msg = match show_reload_success_msg {
     true => Some(text("Successfully reloaded")),
     false => None, 
@@ -64,50 +64,53 @@ pub fn plugin_details_view<'a>(plugin: &Plugin, show_reload_success_msg: bool) -
         plugin_details_state(plugin),
       ]
     ).padding(8),
-    container(rule::Rule::horizontal(1.0)).padding(Padding{top: 0.0, right: 8.0, bottom: 0.0, left: 8.0}),
-    plugin_details_content(plugin),
+    plugin_details_content(&plugin_view.description, plugin),
   ]
   .into()
 }
 
-fn plugin_description<'a>(description: String) -> Element<'a, Message> {
-  let cleaned_description = description.replace("\r\n", "\n");
-  let lines: Vec<String> = cleaned_description.split("\n").map(str::to_string).collect();
-
-  let lines: Vec<Element<'a, Message>> = lines
-    .into_iter()
-    .map(|line| Into::<Element<'a, Message>>::into(text(line)))
-    .collect();
-
-  Column::from_vec(Vec::from_iter(lines))
-    .spacing(6.0)
-    .width(Length::Fill)
-    .into()
-}
-
-fn plugin_details_content<'a>(plugin: &Plugin) -> Element<'a, Message> {
-  let description = if plugin.info.description.len() > 0 {
-    plugin.info.description.clone()
+fn plugin_details_content<'a>(description: &'a Vec<markdown::Item>, plugin: &Plugin) -> Element<'a, Message> {
+  let description: Element<'a, Message> = if plugin.info.description.len() > 0 {
+    markdown::view(description, markdown::Settings::default(), markdown::Style::from_palette(iced::theme::Palette::DARK)).map(Message::Empty)
   } else {
-    String::from("No description")
+    text(String::from("No description")).into()
+  };
+
+  let box_header = |title: &'static str| -> Element<'static, Message> {
+    text(title).size(16).font(bold()).class(Text::Shade(Shade::S200)).into()
   };
 
   Scrollable::new(
-    column![
-      column![
-        text("Description").size(24),
-        plugin_description(description),
-      ].spacing(8.0),
 
-      column![
-        text("Dependencies").size(24),
-        dependencies_list(&plugin.info.dependencies),
-      ]
+    column![
+      plugin_info_box(
+        column![
+          box_header("Description"),
+          description,
+        ].spacing(8.0)
+      ),
+
+      plugin_info_box(
+        column![
+          box_header("Dependencies"),
+          dependencies_list(&plugin.info.dependencies),
+        ].spacing(8.0)
+      )
     ]
-    .spacing(24)
-    .padding(8)
+    .spacing(12)
+    .padding(16)
   )
   .into()
+}
+
+fn plugin_info_box<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+  container(
+    content
+  )
+    .class(Container::Box)
+    .width(Length::Fill)
+    .padding(12.0)
+    .into()
 }
 
 fn dependencies_list<'a>(dependencies: &Vec<PluginDependency>) -> Element<'a, Message> {
