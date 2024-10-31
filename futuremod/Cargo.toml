@@ -25,7 +25,7 @@ fern = {version = "0.6.2", features = ["colored"]}
 futuremod_data = { version = "0.1.0", path = "../futuremod_data" }
 futures = "0.3.30"
 humantime = "2.1.0"
-iced = {version = "0.13.1", features = ["tokio", "advanced", "markdown"]}
+iced = {version = "0.13.1", features = ["tokio", "advanced", "markdown", "highlighter"]}
 iced_aw = {version = "0.11.0", features = ["card", "menu", "drop_down"]}
 iced_fonts = {version = "0.1.1", features = ["bootstrap"]}
 lazy_static = "1.4.0"
