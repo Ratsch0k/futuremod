@@ -125,7 +125,7 @@ pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::E
         match WriteProcessMemory(
             fcop_handle,
             buffer,
-            PCSTR(mod_path.as_ptr()).as_ptr() as *const c_void,
+            PCSTR(format!("{}\0", mod_path).as_ptr()).as_ptr() as *const c_void,
             mod_path.len() + 1,
             None
         ) {
