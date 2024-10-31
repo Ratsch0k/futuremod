@@ -209,8 +209,8 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
     Message::PluginList(view::plugin_list::Message::ToPlugin(name)) => {
       let plugin = dashboard.plugins.get(&name);
       match plugin {
-        Some(_) => {
-          dashboard.view = View::Plugin(view::plugin::Plugin::new(name.clone()));
+        Some(plugin) => {
+          dashboard.view = View::Plugin(view::plugin::Plugin::new(plugin));
         },
         None => {
         }
