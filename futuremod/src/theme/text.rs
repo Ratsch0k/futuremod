@@ -1,6 +1,10 @@
 use iced::{widget::text, Color};
 
+use crate::palette::{BaseColor, Shade};
+
 use super::theme::Theme;
+
+
 
 #[derive(Default)]
 #[allow(unused)]
@@ -11,6 +15,8 @@ pub enum Text<'a> {
   Warn,
   Danger,
   Custom(Box<dyn Fn(&Theme) -> text::Style + 'a>),
+  Base(BaseColor),
+  Shade(Shade),
 }
 
 impl text::Catalog for Theme {
@@ -32,5 +38,7 @@ fn appearance(theme: &Theme, style: &Text) -> text::Style {
     Text::Warn => text::Style { color: Some(theme.palette.warning.medium.color) },
     Text::Danger => text::Style { color: Some(theme.palette.danger.medium.color )},
     Text::Custom(class) => class(theme),
+    Text::Base(base) => text::Style { color: Some(theme.palette.background.get_base(base).text) },
+    Text::Shade(shade) => text::Style { color: Some(theme.palette.base.get_shade(shade)) },
   }
 }
