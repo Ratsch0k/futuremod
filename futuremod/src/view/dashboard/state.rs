@@ -226,7 +226,12 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
     },
     Message::ToSettings => {
       dashboard.view = View::Settings(view::settings::Settings::new());
-    }
+    },
+    Message::OpenUrl(url) | Message::Plugin(view::plugin::Message::OpenUrl(url))  => {
+      if let Err(e) = open::that_detached(url.as_str()) {
+        warn!("Could not open link '{}': {}", url.as_str(), e);
+      }
+    },
     // Message decision tree based on view state
     message => match &mut dashboard.view {
       View::Logs(logs_view) => match message {

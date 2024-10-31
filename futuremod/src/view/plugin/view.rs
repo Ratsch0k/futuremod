@@ -1,4 +1,4 @@
-use iced::{widget::markdown, Task};
+use iced::widget::markdown;
 
 use crate::widget::Element;
 
@@ -18,7 +18,7 @@ pub enum Message {
   Disable(String),
   Reload(String),
   UninstallPrompt(String),
-  Empty(reqwest::Url)
+  OpenUrl(reqwest::Url)
 }
 
 impl Plugin {
@@ -26,11 +26,6 @@ impl Plugin {
     let description = markdown::parse(&plugin.info.description).collect();
 
     Plugin { name: plugin.info.name.clone(), description }
-  }
-
-  #[allow(unused)]
-  pub fn update(&mut self, plugin: &mut futuremod_data::plugin::Plugin, message: Message) -> Task<Message> {
-    Task::none()
   }
 
   pub fn view<'a>(&'a self, plugin: &futuremod_data::plugin::Plugin) -> Element<'a, Message> {

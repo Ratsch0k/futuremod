@@ -1,8 +1,8 @@
 use futuremod_data::plugin::{Plugin, PluginDependency, PluginState};
-use iced::{widget::{column, container, markdown, row, rule, text, Scrollable, Toggler}, Alignment, Length, Padding};
+use iced::{widget::{column, container, markdown, row, text, Scrollable, Toggler}, Alignment, Length, Padding};
 use iced_fonts::Bootstrap;
 
-use crate::{palette::{BaseColor, Shade}, theme::{self, Button, Container, Text}, widget::{bold, button, icon, icon_text_button, icon_text_button_advanced, Column, Element, IconTextButtonOptions, Row}};
+use crate::{palette::Shade, theme::{self, Button, Container, Text}, widget::{bold, button, icon, icon_text_button, icon_text_button_advanced, Column, Element, IconTextButtonOptions, Row}};
 
 use super::Message;
 
@@ -71,7 +71,7 @@ pub fn plugin_details_view<'a>(plugin_view: &'a super::Plugin, plugin: &Plugin, 
 
 fn plugin_details_content<'a>(description: &'a Vec<markdown::Item>, plugin: &Plugin) -> Element<'a, Message> {
   let description: Element<'a, Message> = if plugin.info.description.len() > 0 {
-    markdown::view(description, markdown::Settings::default(), markdown::Style::from_palette(iced::theme::Palette::DARK)).map(Message::Empty)
+    markdown::view(description, markdown::Settings::default(), markdown::Style::from_palette(iced::theme::Palette::DARK)).map(Message::OpenUrl)
   } else {
     text(String::from("No description")).into()
   };
