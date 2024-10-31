@@ -21,6 +21,8 @@ pub fn dashboard<'a>(state: &'a Dashboard) -> Element<'a, Message> {
     View::PluginList(plugin_list_view) => plugin_list_view.view(&state.plugins, state.is_developer)
       .map(Message::PluginList),
     View::Settings(settings_view) => settings_view.view().map(Message::Settings),
+    #[cfg(feature = "debug")]
+    View::Debug(debug_view) => debug_view.view().map(Message::Debug),
   };
 
   let underlay: Element<Message> = column![
@@ -175,13 +177,26 @@ fn tabs<'a>(active_view: &View, minimized: &Animated<bool, Instant>) -> Element<
       .into()
   };
 
-  column![
+  let mut buttons = column![
     tab_button(if !minimized.value {Bootstrap::ChevronDoubleLeft} else {Bootstrap::ChevronDoubleRight}, "Minimize", Some(Message::ToggleSidebar), false),
     tab_button(Bootstrap::Box, "Plugins", Some(Message::ToPluginList), is_plugin_tab(&active_view)),
     tab_button(Bootstrap::CardText, "Logs", Some(Message::ToLogs), matches!(active_view, View::Logs(_))),
-    Space::with_height(Length::Fill),
-    tab_button(Bootstrap::Gear, "Settings", Some(Message::ToSettings), matches!(active_view, View::Settings(_))),
-  ]
+  ];
+
+  #[cfg(feature = "debug")]
+  {
+    buttons = buttons.push_maybe(
+        if cfg!(feature = "debug") {
+          Some(tab_button(Bootstrap::Bug, "Debug", Some(Message::ToDebug), matches!(active_view, View::Debug(_))))
+        } else {
+          None
+        }
+      );
+  }
+  
+  buttons
+    .push(    Space::with_height(Length::Fill))
+    .push(tab_button(Bootstrap::Gear, "Settings", Some(Message::ToSettings), matches!(active_view, View::Settings(_))))
     .spacing(8.0)
     .into()
 }

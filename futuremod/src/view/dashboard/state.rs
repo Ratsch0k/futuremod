@@ -232,6 +232,10 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
         warn!("Could not open link '{}': {}", url.as_str(), e);
       }
     },
+    #[cfg(feature = "debug")]
+    Message::ToDebug => {
+      dashboard.view = View::Debug(view::debug::DebugPage::new());
+    },
     // Message decision tree based on view state
     message => match &mut dashboard.view {
       View::Logs(logs_view) => match message {
@@ -257,6 +261,11 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
       },
       View::Settings(settings_view) => match message {
         Message::Settings(settings_message) => return settings_view.update(settings_message).map(Message::Settings),
+        _ => (),
+      }
+      #[cfg(feature = "debug")]
+      View::Debug(debug_view) => match message {
+        Message::Debug(debug_message) => return debug_view.update(debug_message).map(Message::Debug),
         _ => (),
       }
     },

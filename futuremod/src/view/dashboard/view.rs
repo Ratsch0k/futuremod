@@ -39,6 +39,8 @@ pub enum View{
   Plugin(view::plugin::Plugin),
   PluginList(view::plugin_list::PluginList),
   Settings(view::settings::Settings),
+  #[cfg(feature = "debug")]
+  Debug(view::debug::DebugPage),
 }
 
 #[derive(Debug, Clone)]
@@ -73,7 +75,11 @@ pub enum Message {
   CloseDialog,
   ToggleSidebar,
   Tick,
-  OpenUrl(reqwest::Url)
+  OpenUrl(reqwest::Url),
+  #[cfg(feature = "debug")]
+  ToDebug,
+  #[cfg(feature = "debug")]
+  Debug(crate::view::debug::Message)
 }
 
 #[derive(Debug, Clone)]

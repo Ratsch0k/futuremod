@@ -4,3 +4,5 @@ pub mod dashboard;
 pub mod plugin;
 pub mod plugin_list;
 pub mod settings;
+#[cfg(feature = "debug")]
+pub mod debug;
