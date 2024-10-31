@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use iced::Task;
+use iced::{widget::markdown, Task};
 use log::{debug, info, warn};
 use rfd::FileDialog;
 
@@ -116,11 +116,13 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
 
       return Task::perform(async {
         let response = api::get_plugin_info(plugin_package.clone()).await.map_err(|e| e.to_string())?;
+        let parsed_description = markdown::parse(&response.description).collect();
 
         Ok(InstallConfirmationPrompt {
           plugin: response,
           path: plugin_package,
           in_developer_mode: false,
+          parsed_description,
         })
       }, Message::OpenInstallConfirmationPromptDialog);
     },
@@ -153,10 +155,13 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
       return Task::perform(async move {
         let response = get_plugin_info_of_local_folder(&plugin_package).map_err(|e| e.to_string())?;
 
+        let parsed_description = markdown::parse(&response.description).collect();
+
         Ok(InstallConfirmationPrompt {
           plugin: response,
           path: plugin_package,
           in_developer_mode: true,
+          parsed_description,
         })
       }, Message::OpenInstallConfirmationPromptDialog);
     },
