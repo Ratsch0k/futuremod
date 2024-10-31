@@ -1,0 +1,23 @@
+name = "FPS Display"
+version = "0.1.0"
+authors = ["Simon Kurz"]
+dependencies = ["ui", "system", "math"]
+description = """
+# FPS Counter
+A simple plugin that adds an _FPS counter_ to the **upper left** corner of the screen.
+
+**For now, there is no way to customize the placement.**
+
+## Planned Customization
+In the future, it should be possible to change the FPS counter position to any of the four corners.
+Changing the placement should be possible by using the plugin's settings.
+However, plugin settings are not supported for now.
+This customization will be added once plugin settings are available.
+
+_If you want this feature, please thumb up the [plugin setting issue](https://github.com/Ratsch0k/futuremod/issues/11)._
+
+## Version History
+| Version | Changes |
+| ------- | ------- |
+| 0.1.0   | Initial release |
+"""

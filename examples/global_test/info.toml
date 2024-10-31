@@ -1,0 +1,5 @@
+name = "Globals Test"
+version = "0.1.0"
+authors = ["Simon Kurz"]
+dependencies = []
+description = "Testing some globals"
