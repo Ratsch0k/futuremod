@@ -1,13 +1,25 @@
-use std::{cell::OnceCell, path::{Path, PathBuf}, sync::{Arc, Mutex}, thread, time};
+use std::{
+    cell::OnceCell,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+    thread, time,
+};
 
+use crate::futurecop::global::*;
+use crate::plugins::PluginManager;
+use crate::server;
+use crate::{
+    api::graphics::{self, EXAMPLE_ITEM},
+    config::Config,
+    futurecop::*,
+    input::KeyState,
+    plugins::plugin_manager::GlobalPluginManager,
+    util::resume_all_threads,
+};
+use futuremod_hook::native::{install_hook, Hook};
 use log::*;
 use num;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
-use crate::{api::graphics::{self, EXAMPLE_ITEM}, config::Config, futurecop::*, input::KeyState, plugins::plugin_manager::GlobalPluginManager, util::resume_all_threads};
-use crate::futurecop::global::*;
-use futuremod_hook::native::{install_hook, Hook};
-use crate::server;
-use crate::plugins::PluginManager;
 
 static mut CONFIG: Option<Config> = None;
 
@@ -18,44 +30,50 @@ static mut PLAYER_ENTITY_ADDRESS: Option<u32> = None;
 static mut FIRST_PLAYER: Option<*mut PlayerEntity> = None;
 static mut SECOND_PLAYER: Option<*mut PlayerEntity> = None;
 static mut ORIGINAL_DAMAGE_PLAYER: Option<DamagePlayer> = None;
-static mut FIRST_MISSION_GAME_LOOP_FUNCTION: Option<VoidFunction> = None;   
+static mut FIRST_MISSION_GAME_LOOP_FUNCTION: Option<VoidFunction> = None;
 
 static mut PLUGIN_MANAGER: OnceCell<Arc<Mutex<PluginManager>>> = OnceCell::new();
 
 static mut ORIGINAL_RENDER_TEXT_FUNC: Option<RenderTextFunction> = None;
 
-
 type MissionGameLoop = fn() -> ();
 
 /// Main entry function of the entire mod.
-/// 
+///
 /// Sets some always active hooks, configures and initializes global services (e.g. PluginManager) and starts the server.
 pub fn main(config: Config) {
     unsafe {
         ORIGINAL_PLAYER_METHOD = install_hook(0x00446800, player_method);
 
         let mut hook = Hook::new(FUN_00406A30_ADDRESS);
-        let _ = hook.stack_aware_set_hook(first_mission_game_loop_function as u32).map_err(|_| warn!("Could not hook game loop"));
+        let _ = hook
+            .stack_aware_set_hook(first_mission_game_loop_function as u32)
+            .map_err(|_| warn!("Could not hook game loop"));
 
         CONFIG = Some(config.clone());
     }
 
-    let plugins_directory = config.plugins_directory.clone().map(PathBuf::from).unwrap_or(
-        match std::env::current_dir() {
+    let plugins_directory = config
+        .plugins_directory
+        .clone()
+        .map(PathBuf::from)
+        .unwrap_or(match std::env::current_dir() {
             Ok(path) => Path::join(&path, "plugins"),
             Err(e) => {
-                error!("could not determine mods directory: could not get the current directory: {:?}", e);
+                error!(
+                    "could not determine mods directory: could not get the current directory: {:?}",
+                    e
+                );
                 panic!("could not get the current directory: {:?}", e);
-            },
-        }
-    );
+            }
+        });
 
     // Initialize global plugin manager or panic
     match GlobalPluginManager::initialize(plugins_directory) {
         Err(e) => {
             error!("error while initializing the global plugin manager: {}", e);
             panic!("error while initializing the global plugin manager: {}", e);
-        },
+        }
         Ok(_) => (),
     }
 
@@ -84,8 +102,11 @@ fn first_mission_game_loop_function(o: MissionGameLoop) {
             manager.on_update();
         }
         Err(e) => {
-            error!("error while getting a lock to the plugin manager to call on_update: {:?}", e)
-        },
+            error!(
+                "error while getting a lock to the plugin manager to call on_update: {:?}",
+                e
+            )
+        }
     }
 
     graphics::render_item(EXAMPLE_ITEM);
@@ -94,14 +115,14 @@ fn first_mission_game_loop_function(o: MissionGameLoop) {
 }
 
 fn is_key_pressed(vkey: i32) -> bool {
-        let key_state: i16;
-        unsafe {key_state = GetAsyncKeyState(vkey)};
+    let key_state: i16;
+    unsafe { key_state = GetAsyncKeyState(vkey) };
 
-        return key_state != 0;
+    return key_state != 0;
 }
 
 /// Mod infinite loop.
-/// 
+///
 /// As long as no plugin exists to allow sprinting, this function is used for simple implementation
 /// of a sprinting mod.
 /// Every 10 ms set the player's acceleration to a higher values based on the current values.
@@ -128,25 +149,24 @@ pub fn mod_loop() {
 fn handle_player_sprint(player_id: u8, player_entity: &mut PlayerEntity) {
     let player_sprint_key;
     let player: &mut Player;
-    
+
     unsafe {
         player_sprint_key = match &CONFIG {
             None => return,
             Some(c) => match &c.sprint_config {
-                Some(sprint_config) =>  match player_id {
+                Some(sprint_config) => match player_id {
                     1 => sprint_config.player_one,
                     2 => sprint_config.player_two,
                     _ => return,
                 },
                 None => {
                     return;
-                },
-            }
+                }
+            },
         };
 
         player = &mut *player_entity.player;
     };
-
 
     if is_key_pressed(player_sprint_key as i32) {
         let old_vel_x = (*player).acceleration_x as f32;
@@ -171,7 +191,7 @@ fn handle_player_sprint(player_id: u8, player_entity: &mut PlayerEntity) {
 }
 
 unsafe fn player_method(param1: i32, player_entity: u32, param3: u32, param4: u32) -> u32 {
-    if player_entity > 0  {
+    if player_entity > 0 {
         if PLAYER_ENTITY_ADDRESS.is_none() {
             PLAYER_ENTITY_ADDRESS = Some(player_entity);
         }
@@ -182,7 +202,7 @@ unsafe fn player_method(param1: i32, player_entity: u32, param3: u32, param4: u3
         let game_mode: u32;
 
         game_mode = *game_mode_global.get();
-        
+
         let mut player: Option<u8> = None;
         match (game_mode, id) {
             (0, 1) => player = Some(0),

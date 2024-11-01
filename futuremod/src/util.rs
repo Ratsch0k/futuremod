@@ -1,9 +1,13 @@
-use std::{fs, io, path::{Path, PathBuf}, time::Duration};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
+use anyhow::{anyhow, bail};
 use futuremod_data::plugin::{PluginInfo, PluginInfoContent};
 use iced::Color;
-use palette::{Hsl, FromColor, rgb::Rgb, Mix};
-use anyhow::{anyhow, bail};
+use palette::{rgb::Rgb, FromColor, Hsl, Mix};
 
 // Yoinked from https://github.com/iced-rs/iced/blob/master/style/src/theme/palette.rs because functions are not public
 
@@ -88,7 +92,7 @@ pub fn is_plugin_folder(folder: &PathBuf) -> Result<bool, io::Error> {
 
         // Skip directories
         if entry.file_type()?.is_dir() {
-            continue
+            continue;
         }
 
         match entry.file_name().to_str() {
@@ -115,9 +119,10 @@ pub fn get_plugin_info_of_local_folder(folder: &PathBuf) -> Result<PluginInfo, a
     let content = fs::read_to_string(expected_info_path)
         .map_err(|e| anyhow!("Could not get plugin info: {}", e))?;
 
-    let plugin_info = toml::from_str::<PluginInfoContent>(&content).map_err(|e| anyhow!("Invalid manifest file: {}", e))?;
+    let plugin_info = toml::from_str::<PluginInfoContent>(&content)
+        .map_err(|e| anyhow!("Invalid manifest file: {}", e))?;
 
-    Ok(PluginInfo{
+    Ok(PluginInfo {
         path: folder.clone(),
         authors: plugin_info.authors,
         name: plugin_info.name,

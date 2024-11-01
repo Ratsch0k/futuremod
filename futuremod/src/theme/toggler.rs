@@ -10,6 +10,6 @@ impl toggler::Catalog for Theme {
     }
 
     fn style(&self, class: &Self::Class<'_>, status: toggler::Status) -> toggler::Style {
-      class(self, status)
+        class(self, status)
     }
 }

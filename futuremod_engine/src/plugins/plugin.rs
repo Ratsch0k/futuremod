@@ -1,22 +1,21 @@
-use std::{fs, path::PathBuf, sync::Arc};
+use super::plugin_environment::PluginEnvironment;
 use futuremod_data::plugin::{PluginError, PluginInfo};
 use log::*;
-use mlua::{OwnedFunction, Lua, Table, Function};
+use mlua::{Function, Lua, OwnedFunction, Table};
 use serde::{ser::SerializeStruct, Serialize};
-use super::plugin_environment::PluginEnvironment;
-
+use std::{fs, path::PathBuf, sync::Arc};
 
 const MAIN_FILE_NAME: &str = "main";
 const ALLOWED_EXTENSIONS: [&str; 2] = ["lua", "luau"];
 
 /// Installed mod plugin.
-/// 
+///
 /// Contains the plugin's information and current state.
 /// Is typically managed by [`plugins::PluginManager`]
 #[derive(Debug, Clone, Serialize)]
 pub struct Plugin {
     /// Whether the plugin is enabled or not.
-    /// 
+    ///
     /// A disabled plugin is still in memory, but it's onUpdate function
     /// will not be called every frame.
     enabled: bool,
@@ -60,13 +59,13 @@ impl Into<futuremod_data::plugin::PluginState> for PluginState {
         match self {
             PluginState::Unloaded => futuremod_data::plugin::PluginState::Unloaded,
             PluginState::Error(e) => futuremod_data::plugin::PluginState::Error(e),
-            PluginState::Loaded(c) => futuremod_data::plugin::PluginState::Loaded(c.into())
+            PluginState::Loaded(c) => futuremod_data::plugin::PluginState::Loaded(c.into()),
         }
     }
 }
 
 /// Plugin context.
-/// 
+///
 /// Holds references to the plugin's globals and framework functions.
 #[derive(Debug, Clone)]
 pub struct PluginContext {
@@ -79,7 +78,6 @@ pub struct PluginContext {
     on_install: Option<OwnedFunction>,
     on_uninstall: Option<OwnedFunction>,
 }
-
 
 impl Into<futuremod_data::plugin::PluginContext> for PluginContext {
     fn into(self) -> futuremod_data::plugin::PluginContext {
@@ -106,32 +104,45 @@ fn optional_lua_function_to_string(fun: &Option<OwnedFunction>) -> &'static str 
 impl Serialize for PluginContext {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
-        
+        S: serde::Serializer,
+    {
         let mut s = serializer.serialize_struct("PluginContext", 7)?;
         s.serialize_field("onLoad", optional_lua_function_to_string(&self.on_load))?;
         s.serialize_field("onUnload", optional_lua_function_to_string(&self.on_unload))?;
         s.serialize_field("onUpdate", optional_lua_function_to_string(&self.on_update))?;
         s.serialize_field("onEnable", optional_lua_function_to_string(&self.on_enable))?;
-        s.serialize_field("onDisable", optional_lua_function_to_string(&self.on_disable))?;
-        s.serialize_field("onInstall", optional_lua_function_to_string(&self.on_install))?;
-        s.serialize_field("onUninstall", optional_lua_function_to_string(&self.on_uninstall))?;
+        s.serialize_field(
+            "onDisable",
+            optional_lua_function_to_string(&self.on_disable),
+        )?;
+        s.serialize_field(
+            "onInstall",
+            optional_lua_function_to_string(&self.on_install),
+        )?;
+        s.serialize_field(
+            "onUninstall",
+            optional_lua_function_to_string(&self.on_uninstall),
+        )?;
 
         s.end()
     }
 }
 
-
 impl Plugin {
-
     /// Create a new Plugin instance from the plugin info.
-    /// 
+    ///
     /// This function only creates the plugin struct and doesn't load the actual plugin
     /// into memory.
-    /// 
+    ///
     /// To load the plugin into memory use [`Plugin::load`].
     pub fn new(lua: Arc<Lua>, info: PluginInfo, in_dev_mode: bool) -> Self {
-        Plugin { info, state: PluginState::Unloaded, enabled: false, lua: lua.clone(), in_dev_mode }
+        Plugin {
+            info,
+            state: PluginState::Unloaded,
+            enabled: false,
+            lua: lua.clone(),
+            in_dev_mode,
+        }
     }
 
     fn set_error(&mut self, e: PluginError) -> PluginError {
@@ -140,7 +151,7 @@ impl Plugin {
     }
 
     /// Load the plugin.
-    /// 
+    ///
     /// This method will load the plugin into memory, create its environment and execute the plugin's
     /// main file.
     pub fn load(&mut self) -> Result<(), PluginError> {
@@ -149,7 +160,7 @@ impl Plugin {
             Ok(file) => file,
             Err(e) => {
                 warn!("Couldn't get main file of plugin {:?}: {:?}", info.path, e);
-    
+
                 return Err(self.set_error(PluginError::NoMainFile));
             }
         };
@@ -158,22 +169,36 @@ impl Plugin {
         let main_file_content = match fs::read_to_string(&main_file) {
             Ok(main_file_content) => main_file_content,
             Err(e) => {
-                return Err(self.set_error(PluginError::Error(format!("Error while reading the main file: {:?}", e))));
-            },
+                return Err(self.set_error(PluginError::Error(format!(
+                    "Error while reading the main file: {:?}",
+                    e
+                ))));
+            }
         };
 
         let environment = match PluginEnvironment::new(self.lua.clone(), &info) {
             Ok(env) => env,
             Err(e) => {
-                return Err(self.set_error(PluginError::Error(format!("Could not create mod environment: {:?}", e))));
+                return Err(self.set_error(PluginError::Error(format!(
+                    "Could not create mod environment: {:?}",
+                    e
+                ))));
             }
         };
 
-        match self.lua.load(main_file_content).set_environment(environment.table.clone()).exec() {
+        match self
+            .lua
+            .load(main_file_content)
+            .set_environment(environment.table.clone())
+            .exec()
+        {
             Ok(_) => (),
             Err(e) => {
-                return Err(self.set_error(PluginError::ScriptError(format!("Could not load module: {:?}", e))));
-            },
+                return Err(self.set_error(PluginError::ScriptError(format!(
+                    "Could not load module: {:?}",
+                    e
+                ))));
+            }
         };
 
         let on_load = get_lua_function_or_none(&environment.table.to_ref(), "onLoad");
@@ -201,8 +226,11 @@ impl Plugin {
                 Ok(_) => debug!("Successfully called onLoad"),
                 Err(e) => {
                     warn!("Main function threw error: {:?}", e);
-                    return Err(self.set_error(PluginError::ScriptError(format!("Error while executing onLoad function: {:?}", e))));
-                },
+                    return Err(self.set_error(PluginError::ScriptError(format!(
+                        "Error while executing onLoad function: {:?}",
+                        e
+                    ))));
+                }
             },
             None => (),
         }
@@ -213,7 +241,7 @@ impl Plugin {
     }
 
     /// Unload the plugin.
-    /// 
+    ///
     /// If the plugin is enabled, this function will additionally disable the plugin first.
     /// Unloading the plugin will remove the plugin from memory.
     /// *Should be tested to what extend this actually removes the plugin from memory.*
@@ -233,14 +261,18 @@ impl Plugin {
         // in the plugin's environment.
         self.state = PluginState::Unloaded;
 
-        self.lua.gc_collect().map_err(|e| PluginError::ScriptError(format!("{:?}", e)))?;
-        self.lua.gc_collect().map_err(|e| PluginError::ScriptError(format!("{:?}", e)))?;
+        self.lua
+            .gc_collect()
+            .map_err(|e| PluginError::ScriptError(format!("{:?}", e)))?;
+        self.lua
+            .gc_collect()
+            .map_err(|e| PluginError::ScriptError(format!("{:?}", e)))?;
 
         Ok(())
     }
 
     /// Reload the plugin.
-    /// 
+    ///
     /// Simply unloads the plugin and loads it again.
     /// If the plugin was enabled, it enables it again.
     pub fn reload(&mut self) -> Result<(), PluginError> {
@@ -257,7 +289,7 @@ impl Plugin {
     }
 
     /// Disable the plugin.
-    /// 
+    ///
     /// Will only disable it and not unload it.
     /// Meaning, it is kept in memory but it's `onUpdate` function is not called anymore.
     /// Will call the plugin's `onDisable` function.
@@ -271,9 +303,11 @@ impl Plugin {
                 self.enabled = false;
 
                 if let Some(on_disabled) = &context.on_disable {
-                    on_disabled.call(()).map_err(|e| PluginError::ScriptError(e.to_string()))?;
+                    on_disabled
+                        .call(())
+                        .map_err(|e| PluginError::ScriptError(e.to_string()))?;
                 }
-            },
+            }
             _ => (),
         }
 
@@ -281,7 +315,7 @@ impl Plugin {
     }
 
     /// Enable the plugin.
-    /// 
+    ///
     /// Also calls the plugin's `onEnable` function.
     pub fn enable(&mut self) -> Result<(), PluginError> {
         if self.enabled {
@@ -293,9 +327,11 @@ impl Plugin {
                 self.enabled = true;
 
                 if let Some(on_enabled) = &context.on_enable {
-                    on_enabled.call(()).map_err(|e| PluginError::ScriptError(e.to_string()))?;
+                    on_enabled
+                        .call(())
+                        .map_err(|e| PluginError::ScriptError(e.to_string()))?;
                 }
-            },
+            }
             _ => {
                 warn!("Do not enable mod because it is not loaded");
                 return Err(PluginError::NotLoaded);
@@ -306,7 +342,7 @@ impl Plugin {
     }
 
     /// Call the plugin's `onUpdate` function.
-    /// 
+    ///
     /// Returns an error if the plugin is not enabled.
     /// Will not call the function if the plugin is in an error state.
     pub fn on_update(&self) -> Result<(), PluginError> {
@@ -318,13 +354,18 @@ impl Plugin {
             PluginState::Loaded(context) => {
                 if let Some(on_update) = &context.on_update {
                     debug!("Plugin '{}': Calling on_update", self.info.name);
-                    on_update.call(()).map_err(|e| PluginError::ScriptError(e.to_string()))?;
+                    on_update
+                        .call(())
+                        .map_err(|e| PluginError::ScriptError(e.to_string()))?;
                     debug!("Plugin '{}: Called on_update", self.info.name);
                 } else {
                     debug!("Plugin '{}': on_update not set", self.info.name);
                 }
             }
-            _ => debug!("Plugin '{}': not calling on_update since mod is not loaded", self.info.name),
+            _ => debug!(
+                "Plugin '{}': not calling on_update since mod is not loaded",
+                self.info.name
+            ),
         }
 
         Ok(())
@@ -340,78 +381,89 @@ fn get_lua_function_or_none<'lua>(module: &'lua Table, name: &str) -> Option<Own
     match module.get::<&str, Function>(name) {
         Ok(function) => {
             debug!("Module {:?} has attribute '{}'", module, name);
-            
+
             Some(function.into_owned())
-        },
+        }
         Err(_) => {
             debug!("Module {:?} has no attribute '{}'", module, name);
-  
+
             None
-        },
+        }
     }
 }
 
 /// Searches for the main file of a plugin within a directory.
-/// 
+///
 /// If it cannot identify any main, it will return an error.
 fn discover_main_file(directory: &PathBuf) -> Result<PathBuf, PluginError> {
-    let files = directory.read_dir()
-        .map_err(|e| PluginError::Error(format!("Error while reading mod directory '{:?}': {:?}", directory, e)))?
+    let files = directory
+        .read_dir()
+        .map_err(|e| {
+            PluginError::Error(format!(
+                "Error while reading mod directory '{:?}': {:?}",
+                directory, e
+            ))
+        })?
         .filter_map(|file| match file {
             Ok(file) => {
                 if file.path().is_dir() {
                     debug!("Skipping directory '{:?}'", file);
-                    return None
+                    return None;
                 }
-  
+
                 Some(file)
-            },
+            }
             Err(e) => {
-                warn!("Error while trying to read a file from mod directory '{:?}': {:?}", directory, e);
+                warn!(
+                    "Error while trying to read a file from mod directory '{:?}': {:?}",
+                    directory, e
+                );
                 None
             }
         });
-  
+
     for file in files {
         let file_path = file.path();
-  
+
         debug!("Checking file '{:?}'", file_path);
-  
+
         let file_stem = match file_path.file_stem() {
             Some(stem) => match stem.to_str() {
                 Some(stem) => stem,
                 None => {
                     warn!("Couldn't convert file stem '{:?}' to string", stem);
                     continue;
-                },
+                }
             },
             None => {
                 warn!("Couldn't get file stem of '{:?}'", file);
                 continue;
             }
         };
-  
+
         let file_extension = match file_path.extension() {
             Some(extension) => match extension.to_str() {
                 Some(stem) => stem,
                 None => {
-                    warn!("Couldn't convert file extension '{:?}' to string", extension);
+                    warn!(
+                        "Couldn't convert file extension '{:?}' to string",
+                        extension
+                    );
                     continue;
-                },
+                }
             },
             None => {
                 warn!("Couldn't get file extension of {:?}", file);
                 continue;
             }
         };
-  
+
         debug!("Stem: {}, Extension: {}", file_stem, file_extension);
-  
+
         if file_stem == MAIN_FILE_NAME && ALLOWED_EXTENSIONS.contains(&file_extension) {
-            return Ok(file.path())
+            return Ok(file.path());
         }
     }
-  
+
     Err(PluginError::NoMainFile)
 }
-  

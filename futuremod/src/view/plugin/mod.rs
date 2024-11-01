@@ -1,4 +1,4 @@
 mod components;
 mod view;
 
-pub use view::{Plugin, Message};
+pub use view::{Message, Plugin};

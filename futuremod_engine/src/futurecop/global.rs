@@ -7,7 +7,7 @@ use crate::futurecop::*;
 pub trait GetterSetter<T> {
     fn get(&self) -> &T;
 
-    fn set(&mut self, value: T); 
+    fn set(&mut self, value: T);
 }
 
 #[derive(Clone, Copy, Serialize)]
@@ -60,9 +60,7 @@ pub struct Global<T: Debug> {
 
 impl<T: Debug> Global<T> {
     pub fn new(default: T) -> Self {
-        Self {
-            value: default,
-        }
+        Self { value: default }
     }
 }
 
@@ -120,6 +118,8 @@ impl Debug for SelectedGameMode {
 
         value = self.get();
 
-        f.debug_struct("SelectedGameMode").field("value", &value).finish()
+        f.debug_struct("SelectedGameMode")
+            .field("value", &value)
+            .finish()
     }
 }

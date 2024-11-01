@@ -4,29 +4,28 @@ use serde::{Deserialize, Serialize};
 
 use crate::futurecop::{self, RenderCharacterFunction, RENDER_CHARACTER_FUNCTION_ADDRESS};
 
-
 /// Renders a character onto the screen at the position with a palette.
-/// 
+///
 /// This function returns the the y position where the next character should be rendered.
-/// 
+///
 /// Directly calls an internal game function to accomplish the rendering.
 /// **For now, this function does not perform any runtime checks to avoid crashes, so be careful.**
 pub fn render_character(character: u32, pos_x: u32, pos_y: u32, palette: u32) -> u32 {
-    let fn_ptr = RENDER_CHARACTER_FUNCTION_ADDRESS as *const();
+    let fn_ptr = RENDER_CHARACTER_FUNCTION_ADDRESS as *const ();
     unsafe {
-        let render_character_fn = {std::mem::transmute::<_, RenderCharacterFunction>(fn_ptr)};
+        let render_character_fn = { std::mem::transmute::<_, RenderCharacterFunction>(fn_ptr) };
         render_character_fn(character, pos_x, pos_y, palette)
     }
 }
 
 /// Render text at a position with a specific palette.
-/// 
+///
 /// Renders the string in `text` at the position specified with `pos_x` and `pos_y` using the palette
 /// specified in `palette`.
 /// The position is absolute.
-/// 
+///
 /// The text palette mainly determines the text's color. Refer to [`TextPalette`] for more details.
-/// 
+///
 /// **Important: Only use characters that are supported by the game's font texture. Usually, this should include
 /// all numbers, characters in the alphabet, and some special characters. However, be careful as it doesn't support
 /// all ASCII special characters.**
@@ -36,12 +35,12 @@ pub fn render_text(pos_x: u32, pos_y: u32, palette: TextPalette, text: &str) {
 }
 
 /// Palette for text.
-/// 
+///
 /// Each item represents one palette.
 /// A palette gives a text a specific color.
 /// This enum also provides the item [`TextPalette::Unknown(u32)`] that allows you to specify
 /// any palette you want. Invalid palettes will lead to invisible text.
-/// 
+///
 /// Based on internal game logic, a palette is identified with a number.
 #[derive(Debug, Clone, Copy)]
 pub enum TextPalette {
@@ -88,7 +87,6 @@ impl Display for TextPalette {
         write!(f, "{:?}", self)
     }
 }
-
 
 impl Into<u32> for TextPalette {
     fn into(self) -> u32 {
@@ -157,12 +155,26 @@ impl Into<u32> for Color {
     }
 }
 
-pub fn render_rectangle(color: Color, pos_x: u16, pos_y: u16, width: u16, height: u16, semi_transparent: bool) {
+pub fn render_rectangle(
+    color: Color,
+    pos_x: u16,
+    pos_y: u16,
+    width: u16,
+    height: u16,
+    semi_transparent: bool,
+) {
     let converted_color: u32 = color.into();
     let converted_semi_transparent = match semi_transparent {
         true => 0x3d,
         false => 0x35,
     };
 
-    futurecop::render_rectangle(converted_color, pos_x, pos_y, width, height, converted_semi_transparent)
+    futurecop::render_rectangle(
+        converted_color,
+        pos_x,
+        pos_y,
+        width,
+        height,
+        converted_semi_transparent,
+    )
 }

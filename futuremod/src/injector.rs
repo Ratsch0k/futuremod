@@ -1,54 +1,73 @@
 use std::{ffi::c_void, mem::size_of};
 
-use log::{debug, info};
-use windows::{core::PCSTR, Win32::{Foundation::{GetLastError, HANDLE}, Security::{GetTokenInformation, TokenElevation, TOKEN_ALL_ACCESS, TOKEN_ELEVATION}, System::{Diagnostics::{Debug::WriteProcessMemory, ToolHelp::{CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS}}, LibraryLoader::{GetModuleHandleA, GetProcAddress}, Memory::{VirtualAllocEx, MEM_COMMIT, PAGE_READWRITE}, Threading::{CreateRemoteThread, OpenProcess, OpenProcessToken, LPTHREAD_START_ROUTINE, PROCESS_ALL_ACCESS}}}};
 use anyhow::anyhow;
+use log::{debug, info};
+use windows::{
+    core::PCSTR,
+    Win32::{
+        Foundation::{GetLastError, HANDLE},
+        Security::{GetTokenInformation, TokenElevation, TOKEN_ALL_ACCESS, TOKEN_ELEVATION},
+        System::{
+            Diagnostics::{
+                Debug::WriteProcessMemory,
+                ToolHelp::{
+                    CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32,
+                    TH32CS_SNAPPROCESS,
+                },
+            },
+            LibraryLoader::{GetModuleHandleA, GetProcAddress},
+            Memory::{VirtualAllocEx, MEM_COMMIT, PAGE_READWRITE},
+            Threading::{
+                CreateRemoteThread, OpenProcess, OpenProcessToken, LPTHREAD_START_ROUTINE,
+                PROCESS_ALL_ACCESS,
+            },
+        },
+    },
+};
 
 use crate::config;
 
-
 pub fn get_pid() -> Result<Option<u32>, anyhow::Error> {
-  info!("Get process id of process");
-  let config = config::get();
+    info!("Get process id of process");
+    let config = config::get();
 
-  unsafe {
-      let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-          .map_err(|e| anyhow!("Error while getting list of process ids: {}", e))?;
-    
-      debug!("Got list of process ids");
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+            .map_err(|e| anyhow!("Error while getting list of process ids: {}", e))?;
 
-      let mut entry: PROCESSENTRY32 = PROCESSENTRY32::default();
-      entry.dwSize = size_of::<PROCESSENTRY32>() as u32;
+        debug!("Got list of process ids");
 
-      match Process32First(snapshot, &mut entry) {
-          Ok(_) => {
-              while Process32Next(snapshot, &mut entry).is_ok() {
-                  match PCSTR::from_raw(entry.szExeFile.as_ptr()).to_string() {
-                      Ok(process_name) => {
-                          if process_name.as_str() == config.process_name {
-                              debug!("Found process in list of processes");
-                              return Ok(Some(entry.th32ProcessID));
-                          }
-                      }
-                      Err(_) => (),
-                  }
+        let mut entry: PROCESSENTRY32 = PROCESSENTRY32::default();
+        entry.dwSize = size_of::<PROCESSENTRY32>() as u32;
 
-              }
+        match Process32First(snapshot, &mut entry) {
+            Ok(_) => {
+                while Process32Next(snapshot, &mut entry).is_ok() {
+                    match PCSTR::from_raw(entry.szExeFile.as_ptr()).to_string() {
+                        Ok(process_name) => {
+                            if process_name.as_str() == config.process_name {
+                                debug!("Found process in list of processes");
+                                return Ok(Some(entry.th32ProcessID));
+                            }
+                        }
+                        Err(_) => (),
+                    }
+                }
 
-              debug!("Couldn't find process");
-              Ok(None)
-          },
-          Err(e) => Err(anyhow!("Error while checking first process id: {}", e)),
-      }
-  }
+                debug!("Couldn't find process");
+                Ok(None)
+            }
+            Err(e) => Err(anyhow!("Error while checking first process id: {}", e)),
+        }
+    }
 }
 
 pub fn get_future_cop_handle(require_admin: bool) -> Result<Option<HANDLE>, anyhow::Error> {
     info!("Getting handle to futurecop process");
     let pid = match get_pid() {
         Ok(pid) => match pid {
-                Some(pid) => pid,
-                None => return Ok(None),
+            Some(pid) => pid,
+            None => return Ok(None),
         },
         Err(e) => return Err(e),
     };
@@ -57,11 +76,11 @@ pub fn get_future_cop_handle(require_admin: bool) -> Result<Option<HANDLE>, anyh
     debug!("Getting handle");
     let process_handle: HANDLE;
     unsafe {
-        process_handle = match OpenProcess(PROCESS_ALL_ACCESS, None,  pid) {
+        process_handle = match OpenProcess(PROCESS_ALL_ACCESS, None, pid) {
             Ok(handle) => {
                 debug!("Got handle to process");
                 handle
-            },
+            }
             Err(e) => return Err(anyhow!("Could not open process: {}", e)),
         };
     }
@@ -70,47 +89,56 @@ pub fn get_future_cop_handle(require_admin: bool) -> Result<Option<HANDLE>, anyh
         debug!("Checking elevation of process");
 
         let mut process_elevation = TOKEN_ELEVATION::default();
-    
+
         unsafe {
             let mut token_handle = HANDLE::default();
             match OpenProcessToken(process_handle, TOKEN_ALL_ACCESS, &mut token_handle) {
                 Err(e) => return Err(anyhow!("Could not open process token: {}", e)),
                 _ => (),
             };
-    
+
             let token_info: Option<*mut c_void> = Some(std::mem::transmute(&mut process_elevation));
             let mut return_length = 0u32;
             match GetTokenInformation(
-                token_handle, 
-                TokenElevation, 
-                token_info, 
-                size_of::<TOKEN_ELEVATION>() as u32, 
-                &mut return_length
+                token_handle,
+                TokenElevation,
+                token_info,
+                size_of::<TOKEN_ELEVATION>() as u32,
+                &mut return_length,
             ) {
-                Err(e) => return Err(anyhow!("Could not get elevation information about process: {}", e)),
+                Err(e) => {
+                    return Err(anyhow!(
+                        "Could not get elevation information about process: {}",
+                        e
+                    ))
+                }
                 _ => (),
             }
         }
-    
-    
+
         if process_elevation.TokenIsElevated != 0 {
             debug!("Process is elevated. Returning handle");
             return Ok(Some(process_handle));
         }
-    
+
         debug!("Process is not elevated");
-        return Ok(None)
+        return Ok(None);
     }
 
     return Ok(Some(process_handle));
-
 }
 
 pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::Error> {
     info!("Injecting mod");
     unsafe {
         debug!("Allocating memory in process");
-        let buffer = VirtualAllocEx(fcop_handle, None, mod_path.len() + 1, MEM_COMMIT, PAGE_READWRITE);
+        let buffer = VirtualAllocEx(
+            fcop_handle,
+            None,
+            mod_path.len() + 1,
+            MEM_COMMIT,
+            PAGE_READWRITE,
+        );
 
         if buffer.is_null() {
             let error = match GetLastError() {
@@ -118,7 +146,7 @@ pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::E
                 Err(e) => e.to_string(),
             };
 
-            return Err(anyhow!("Could not allocate buffer in process: {}", error))
+            return Err(anyhow!("Could not allocate buffer in process: {}", error));
         }
 
         debug!("Writing path to mod into process");
@@ -127,7 +155,7 @@ pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::E
             buffer,
             PCSTR(format!("{}\0", mod_path).as_ptr()).as_ptr() as *const c_void,
             mod_path.len() + 1,
-            None
+            None,
         ) {
             Err(e) => return Err(anyhow!("Could not write to process: {}", e)),
             _ => (),
@@ -139,7 +167,10 @@ pub fn inject_mod(fcop_handle: HANDLE, mod_path: String) -> Result<(), anyhow::E
             Err(e) => return Err(anyhow!("Could not get handle to Kernel32: {}", e)),
         };
 
-        let start_routine_address: LPTHREAD_START_ROUTINE = std::mem::transmute(GetProcAddress(kernel32_handle, PCSTR("LoadLibraryA\0".as_ptr())));
+        let start_routine_address: LPTHREAD_START_ROUTINE = std::mem::transmute(GetProcAddress(
+            kernel32_handle,
+            PCSTR("LoadLibraryA\0".as_ptr()),
+        ));
 
         debug!("Creating remote thread to load mod");
         match CreateRemoteThread(

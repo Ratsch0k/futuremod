@@ -1,22 +1,21 @@
-use std::{io, str::FromStr, time::SystemTime};
-use fern::colors::{ColoredLevelConfig, Color};
+use clap::builder::TypedValueParser as _;
+use clap::Parser;
+use fern::colors::{Color, ColoredLevelConfig};
+use iced::Size;
 use iced_fonts::BOOTSTRAP_FONT_BYTES;
 use log::*;
-use clap::Parser;
-use clap::builder::TypedValueParser as _;
-use iced::Size;
+use std::{io, str::FromStr, time::SystemTime};
 
-mod gui;
-mod config;
-mod view;
 mod api;
+mod config;
+mod gui;
 mod injector;
-mod theme;
-mod widget;
-mod util;
-mod palette;
 mod logs;
-
+mod palette;
+mod theme;
+mod util;
+mod view;
+mod widget;
 
 #[derive(Parser)]
 struct Cli {
@@ -45,9 +44,7 @@ fn main() -> iced::Result {
         .error(Color::BrightRed);
 
     match fern::Dispatch::new()
-        .level(
-            args.log_level,
-        )
+        .level(args.log_level)
         .level_for("wgpu_hal", log::LevelFilter::Error)
         .level_for("wgpu_core", log::LevelFilter::Error)
         .level_for("cosmic_text", log::LevelFilter::Error)
@@ -72,7 +69,7 @@ fn main() -> iced::Result {
 
     match config::init(&args.config) {
         Ok(_) => (),
-        Err(e) => panic!("{}", e)
+        Err(e) => panic!("{}", e),
     }
 
     if args.developer {
@@ -81,11 +78,15 @@ fn main() -> iced::Result {
         info!("Starting application");
     }
 
-    iced::application::<gui::ModInjector, gui::Message, crate::theme::Theme, iced::Renderer>(gui::title, gui::update, gui::view)
-        .subscription(gui::subscription)
-        .theme(gui::theme)
-        .window_size(Size::new(1024.0, 800.0))
-        .font(BOOTSTRAP_FONT_BYTES)
-        .antialiasing(true)
-        .run_with(move || gui::ModInjector::new(args.developer))
+    iced::application::<gui::ModInjector, gui::Message, crate::theme::Theme, iced::Renderer>(
+        gui::title,
+        gui::update,
+        gui::view,
+    )
+    .subscription(gui::subscription)
+    .theme(gui::theme)
+    .window_size(Size::new(1024.0, 800.0))
+    .font(BOOTSTRAP_FONT_BYTES)
+    .antialiasing(true)
+    .run_with(move || gui::ModInjector::new(args.developer))
 }

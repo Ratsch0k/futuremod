@@ -4,11 +4,11 @@ use super::Theme;
 
 impl rule::Catalog for Theme {
     type Class<'a> = rule::StyleFn<'a, Theme>;
-    
+
     fn default<'a>() -> Self::Class<'a> {
         Box::new(default)
     }
-    
+
     fn style(&self, class: &Self::Class<'_>) -> rule::Style {
         class(self)
     }

@@ -10,6 +10,6 @@ impl badge::Catalog for Theme {
     }
 
     fn style(&self, class: &Self::Class<'_>, status: iced_aw::card::Status) -> badge::Style {
-      class(self, status)
+        class(self, status)
     }
 }

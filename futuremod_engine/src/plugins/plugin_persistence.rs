@@ -1,11 +1,15 @@
-use std::{collections::HashMap, fs, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
+use anyhow::{anyhow, bail};
 use log::debug;
 use serde::{Deserialize, Serialize};
-use anyhow::{bail, anyhow};
 
 /// Persistence state of a plugin which indicates how a plugin should be loaded on the next start.
-/// 
+///
 /// This doesn't reflect the actual plugin's state.
 /// For example, if a plugin was loaded and enabled but threw an error during the loading process
 /// and thus has now the state [`PluginState::Error`], it will have the state [`StoredPluginState::Disabled`].
@@ -19,7 +23,7 @@ pub enum PersistentPluginState {
 }
 
 /// Persistent plugin information.
-/// 
+///
 /// Contains all the information necessary for the plugin manager to load a plugin
 /// from the plugin folder.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,24 +43,33 @@ impl PersistedPlugins {
         debug!("Reading plugin states from '{}'", path.display());
 
         let states: HashMap<String, PersistedPlugin> = match fs::read_to_string(path) {
-            Ok(content) => serde_json::from_str(&content).map_err(|e| anyhow!("could not parse the plugin states file: {}", e.to_string()))?,
+            Ok(content) => serde_json::from_str(&content).map_err(|e| {
+                anyhow!("could not parse the plugin states file: {}", e.to_string())
+            })?,
             Err(_) => HashMap::new(),
         };
 
-        Ok(PersistedPlugins { states, path: path.to_path_buf() })
+        Ok(PersistedPlugins {
+            states,
+            path: path.to_path_buf(),
+        })
     }
 
     pub fn get_state(&self, name: &str) -> Option<&PersistedPlugin> {
         self.states.get(name)
     }
 
-    pub fn insert(&mut self, name: &str, state: PersistedPlugin) -> Result<(), anyhow::Error>{
+    pub fn insert(&mut self, name: &str, state: PersistedPlugin) -> Result<(), anyhow::Error> {
         self.states.insert(name.into(), state);
 
         self.write_to_file()
     }
 
-    pub fn update_state(&mut self, name: &str, state: PersistentPluginState) -> Result<(), anyhow::Error> {
+    pub fn update_state(
+        &mut self,
+        name: &str,
+        state: PersistentPluginState,
+    ) -> Result<(), anyhow::Error> {
         let plugin_state = match self.states.get_mut(name) {
             Some(p) => p,
             None => bail!("Plugin doesn't exist"),
@@ -68,9 +81,15 @@ impl PersistedPlugins {
     }
 
     pub fn write_to_file(&self) -> Result<(), anyhow::Error> {
-        let content = serde_json::to_string(&self.states).map_err(|e| anyhow!("could not serialize plugin states to string: {}", e.to_string()))?;
+        let content = serde_json::to_string(&self.states).map_err(|e| {
+            anyhow!(
+                "could not serialize plugin states to string: {}",
+                e.to_string()
+            )
+        })?;
 
-        fs::write(&self.path, content).map_err(|e| anyhow!("could not persist change: {}", e.to_string()))
+        fs::write(&self.path, content)
+            .map_err(|e| anyhow!("could not persist change: {}", e.to_string()))
     }
 
     pub fn remove(&mut self, name: &str) -> Result<(), anyhow::Error> {

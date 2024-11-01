@@ -3,17 +3,17 @@
 /// Based on the given default theme and implements custom styling only for some widgets.
 #[derive(Debug, Default)]
 pub struct Theme {
-  pub theme: iced::Theme,
-  pub palette: crate::palette::Palette,
+    pub theme: iced::Theme,
+    pub palette: crate::palette::Palette,
 }
 
 impl Theme {
-  pub fn new(palette: crate::palette::Palette) -> Self {
-    Theme {
-      theme: palette.to_theme(),
-      palette,
+    pub fn new(palette: crate::palette::Palette) -> Self {
+        Theme {
+            theme: palette.to_theme(),
+            palette,
+        }
     }
-  }
 }
 
 impl iced::application::DefaultStyle for Theme {
