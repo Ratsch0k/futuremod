@@ -1,4 +1,8 @@
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
+
+use crate::get_data_directory;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,11 +28,10 @@ pub struct Config {
     pub log_level: String,
 
     /// Fixed path to the plugins directory.
-    /// By default this option is None.
-    ///
-    /// If this is None, it will load plugins from the directory "plugins" within
-    /// the games root directory. For example: `C:\\Program Files (x86)\\Electronic Arts\\Future Cop\\plugins`
-    pub plugins_directory: Option<String>,
+    /// By default this option is set to `<data_directory>\\plugins`.
+    /// This should be `C:\\Users\\<user>\\AppData\\Roaming\\futuremod\\plugins`.
+    #[serde(default = "default_plugins_directory")]
+    pub plugins_directory: String,
 
     /// Optional sprint config that specifies for both players their sprint key.
     ///
@@ -47,12 +50,21 @@ fn default_log_level() -> String {
     "INFO".to_string()
 }
 
+fn default_plugins_directory() -> String {
+    get_data_directory()
+        .map(|path| Path::join(&path, "plugins"))
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
             server: default_server(),
             log_level: default_log_level(),
-            plugins_directory: None,
+            plugins_directory: default_plugins_directory(),
             sprint_config: None,
         }
     }
