@@ -10,6 +10,7 @@ pub mod toggler;
 pub mod badge;
 pub mod menu;
 pub mod text_input;
+pub mod markdown;
 
 pub use theme::Theme;
 pub use text::Text;

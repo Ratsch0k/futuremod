@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use iced::Task;
+use iced::{widget::markdown, Task};
 use log::{debug, info, warn};
 use rfd::FileDialog;
 
@@ -116,11 +116,13 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
 
       return Task::perform(async {
         let response = api::get_plugin_info(plugin_package.clone()).await.map_err(|e| e.to_string())?;
+        let parsed_description = markdown::parse(&response.description).collect();
 
         Ok(InstallConfirmationPrompt {
           plugin: response,
           path: plugin_package,
           in_developer_mode: false,
+          parsed_description,
         })
       }, Message::OpenInstallConfirmationPromptDialog);
     },
@@ -153,10 +155,13 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
       return Task::perform(async move {
         let response = get_plugin_info_of_local_folder(&plugin_package).map_err(|e| e.to_string())?;
 
+        let parsed_description = markdown::parse(&response.description).collect();
+
         Ok(InstallConfirmationPrompt {
           plugin: response,
           path: plugin_package,
           in_developer_mode: true,
+          parsed_description,
         })
       }, Message::OpenInstallConfirmationPromptDialog);
     },
@@ -209,8 +214,8 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
     Message::PluginList(view::plugin_list::Message::ToPlugin(name)) => {
       let plugin = dashboard.plugins.get(&name);
       match plugin {
-        Some(_) => {
-          dashboard.view = View::Plugin(view::plugin::Plugin::new(name.clone()));
+        Some(plugin) => {
+          dashboard.view = View::Plugin(view::plugin::Plugin::new(plugin));
         },
         None => {
         }
@@ -221,7 +226,16 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
     },
     Message::ToSettings => {
       dashboard.view = View::Settings(view::settings::Settings::new());
-    }
+    },
+    Message::OpenUrl(url) | Message::Plugin(view::plugin::Message::OpenUrl(url))  => {
+      if let Err(e) = open::that_detached(url.as_str()) {
+        warn!("Could not open link '{}': {}", url.as_str(), e);
+      }
+    },
+    #[cfg(feature = "debug")]
+    Message::ToDebug => {
+      dashboard.view = View::Debug(view::debug::DebugPage::new());
+    },
     // Message decision tree based on view state
     message => match &mut dashboard.view {
       View::Logs(logs_view) => match message {
@@ -247,6 +261,11 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
       },
       View::Settings(settings_view) => match message {
         Message::Settings(settings_message) => return settings_view.update(settings_message).map(Message::Settings),
+        _ => (),
+      }
+      #[cfg(feature = "debug")]
+      View::Debug(debug_view) => match message {
+        Message::Debug(debug_message) => return debug_view.update(debug_message).map(Message::Debug),
         _ => (),
       }
     },

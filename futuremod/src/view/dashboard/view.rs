@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, time::Instant};
 
 use futuremod_data::plugin::{Plugin, PluginInfo};
-use iced::{window::frames, Subscription, Task};
+use iced::{widget::markdown, window::frames, Subscription, Task};
 use lilt::{Animated, Easing};
 
 use crate::{logs, view::{self, plugin_list}, widget::Element};
@@ -39,6 +39,8 @@ pub enum View{
   Plugin(view::plugin::Plugin),
   PluginList(view::plugin_list::PluginList),
   Settings(view::settings::Settings),
+  #[cfg(feature = "debug")]
+  Debug(view::debug::DebugPage),
 }
 
 #[derive(Debug, Clone)]
@@ -73,11 +75,17 @@ pub enum Message {
   CloseDialog,
   ToggleSidebar,
   Tick,
+  OpenUrl(reqwest::Url),
+  #[cfg(feature = "debug")]
+  ToDebug,
+  #[cfg(feature = "debug")]
+  Debug(crate::view::debug::Message)
 }
 
 #[derive(Debug, Clone)]
 pub struct InstallConfirmationPrompt {
   pub plugin: PluginInfo,
+  pub parsed_description: Vec<markdown::Item>,
   pub path: PathBuf,
   pub in_developer_mode: bool,
 }

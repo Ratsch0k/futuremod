@@ -137,6 +137,15 @@ dependencies = ["ui", "system", "math"]
 description = "Simple FPS display using the UI library."
 ```
 
+The description supports basic markdown.
+However, only the following markdown features are supported:
+- heading
+- lists
+- paragraph
+- code block (no syntax highlighting)
+
+Unfortunately, tables are not yet supported.
+
 #### Main File
 The main file is the entry point for the plugin and is loaded by the modding framework when the plugin is installed.
 It must be located in the plugin's root directory and is called `main.lua` (you can also use the ending `.luau`).

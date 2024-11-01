@@ -15,6 +15,152 @@ pub struct ColorRange {
   pub darkest: Pair,
 }
 
+#[derive(Debug)]
+pub enum BaseColor {
+  Lightest,
+  Light,
+  Medium,
+  Dark,
+  Darkest,
+}
+
+impl ColorRange {
+  /// Get a specific base color from the color range.
+  pub fn get_base(&self, base: &BaseColor) -> Pair {
+    match base {
+        BaseColor::Lightest => self.lightest,
+        BaseColor::Light => self.light,
+        BaseColor::Medium => self.medium,
+        BaseColor::Dark => self.dark,
+        BaseColor::Darkest => self.darkest,
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub enum Shade {
+  S50,
+  S100,
+  S200,
+  S300,
+  S400,
+  S500,
+  S600,
+  S700,
+  S800,
+  S900,
+  S950,
+}
+
+impl Shade {
+  pub fn lighter(&self) -> Shade {
+    match self {
+        Shade::S50 => Shade::S50,
+        Shade::S100 => Shade::S50,
+        Shade::S200 => Shade::S100,
+        Shade::S300 => Shade::S200,
+        Shade::S400 => Shade::S300,
+        Shade::S500 => Shade::S400,
+        Shade::S600 => Shade::S500,
+        Shade::S700 => Shade::S600,
+        Shade::S800 => Shade::S700,
+        Shade::S900 => Shade::S800,
+        Shade::S950 => Shade::S900,
+    }
+  }
+
+  pub fn darker(&self) -> Shade {
+    match self {
+      Shade::S50 => Shade::S100,
+      Shade::S100 => Shade::S200,
+      Shade::S200 => Shade::S300,
+      Shade::S300 => Shade::S400,
+      Shade::S400 => Shade::S500,
+      Shade::S500 => Shade::S600,
+      Shade::S600 => Shade::S700,
+      Shade::S700 => Shade::S800,
+      Shade::S800 => Shade::S900,
+      Shade::S900 => Shade::S950,
+      Shade::S950 => Shade::S950,
+    }
+  }
+
+  pub fn get_contrast(&self) -> Shade {
+    match self {
+        Shade::S50 => Shade::S950,
+        Shade::S100 => Shade::S950,
+        Shade::S200 => Shade::S950,
+        Shade::S300 => Shade::S950,
+        Shade::S400 => Shade::S950,
+        Shade::S500 => Shade::S50,
+        Shade::S600 => Shade::S50,
+        Shade::S700 => Shade::S50,
+        Shade::S800 => Shade::S50,
+        Shade::S900 => Shade::S50,
+        Shade::S950 => Shade::S50,
+    }
+  }
+
+  pub fn slight_contrast(&self) -> Shade {
+    match self {
+      Shade::S50 => Shade::S100,
+      Shade::S100 => Shade::S200,
+      Shade::S200 => Shade::S300,
+      Shade::S300 => Shade::S400,
+      Shade::S400 => Shade::S500,
+      Shade::S500 => Shade::S600,
+      Shade::S600 => Shade::S500,
+      Shade::S700 => Shade::S600,
+      Shade::S800 => Shade::S700,
+      Shade::S900 => Shade::S800,
+      Shade::S950 => Shade::S900,
+  }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct ColorShades {
+  s50: Color,
+  s100: Color,
+  s200: Color,
+  s300: Color,
+  s400: Color,
+  s500: Color,
+  s600: Color,
+  s700: Color,
+  s800: Color,
+  s900: Color,
+  s950: Color,
+}
+
+impl ColorShades {
+  pub fn get_shade(&self, shade: &Shade) -> Color {
+    match shade {
+        Shade::S50 => self.s50,
+        Shade::S100 => self.s100,
+        Shade::S200 => self.s200,
+        Shade::S300 => self.s300,
+        Shade::S400 => self.s400,
+        Shade::S500 => self.s500,
+        Shade::S600 => self.s600,
+        Shade::S700 => self.s700,
+        Shade::S800 => self.s800,
+        Shade::S900 => self.s900,
+        Shade::S950 => self.s950,
+    }
+  }
+
+  pub fn get_base(&self, base: &BaseColor) -> Color {
+    match base {
+        BaseColor::Lightest => self.s100,
+        BaseColor::Light => self.s300,
+        BaseColor::Medium => self.s500,
+        BaseColor::Dark => self.s700,
+        BaseColor::Darkest => self.s900,
+    }
+  }
+}
+
 /// Custom palette struct with much more color selection.
 /// 
 /// Is based on the extended palette
@@ -28,7 +174,10 @@ pub struct Palette {
   pub success: ColorRange,
   pub warning: ColorRange,
   pub danger: ColorRange,
+  pub base: ColorShades,
 }
+
+
 
 impl Default for Palette {
     fn default() -> Self {
@@ -93,6 +242,19 @@ impl Default for Palette {
             text: color!(0xFFFFFF),
           },
         },
+        base: ColorShades {
+            s50: color!(0xEEEEEF),
+            s100: color!(0xDEDCE0),
+            s200: color!(0xCDCBD0),
+            s300: color!(0xBDB9C0),
+            s400: color!(0xACA8B0),
+            s500: color!(0x8B8591),
+            s600: color!(0x59555E),
+            s700: color!(0x49454C),
+            s800: color!(0x38353B),
+            s900: color!(0x28262A),
+            s950: color!(0x161517),
+        }
       }
     }
 }

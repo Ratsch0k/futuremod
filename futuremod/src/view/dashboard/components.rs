@@ -1,11 +1,11 @@
 use std::time::Instant;
 
 use futuremod_data::plugin::PluginDependency;
-use iced::{alignment::{Horizontal, Vertical}, widget::{center, column, container, mouse_area, opaque, row, rule, scrollable, text, Space, Stack}, Alignment, Color, Length, Padding};
+use iced::{alignment::{Horizontal, Vertical}, theme::Palette, widget::{center, column, container, markdown, mouse_area, opaque, row, rule, scrollable, text, Space, Stack}, Alignment, Color, Length, Padding};
 use iced_fonts::Bootstrap;
 use lilt::Animated;
 
-use crate::{theme::{self, Container, Theme}, widget::{button, icon_button, icon_with_size, Column, Element, Row}};
+use crate::{palette::Shade, theme::{self, Container, Text, Theme}, widget::{bold, button, icon_button, icon_with_size, Column, Element, Row}};
 
 use super::{view::{Dialog, InstallConfirmationPrompt, View}, Dashboard, Message};
 
@@ -21,6 +21,8 @@ pub fn dashboard<'a>(state: &'a Dashboard) -> Element<'a, Message> {
     View::PluginList(plugin_list_view) => plugin_list_view.view(&state.plugins, state.is_developer)
       .map(Message::PluginList),
     View::Settings(settings_view) => settings_view.view().map(Message::Settings),
+    #[cfg(feature = "debug")]
+    View::Debug(debug_view) => debug_view.view().map(Message::Debug),
   };
 
   let underlay: Element<Message> = column![
@@ -175,13 +177,26 @@ fn tabs<'a>(active_view: &View, minimized: &Animated<bool, Instant>) -> Element<
       .into()
   };
 
-  column![
+  let mut buttons = column![
     tab_button(if !minimized.value {Bootstrap::ChevronDoubleLeft} else {Bootstrap::ChevronDoubleRight}, "Minimize", Some(Message::ToggleSidebar), false),
     tab_button(Bootstrap::Box, "Plugins", Some(Message::ToPluginList), is_plugin_tab(&active_view)),
     tab_button(Bootstrap::CardText, "Logs", Some(Message::ToLogs), matches!(active_view, View::Logs(_))),
-    Space::with_height(Length::Fill),
-    tab_button(Bootstrap::Gear, "Settings", Some(Message::ToSettings), matches!(active_view, View::Settings(_))),
-  ]
+  ];
+
+  #[cfg(feature = "debug")]
+  {
+    buttons = buttons.push_maybe(
+        if cfg!(feature = "debug") {
+          Some(tab_button(Bootstrap::Bug, "Debug", Some(Message::ToDebug), matches!(active_view, View::Debug(_))))
+        } else {
+          None
+        }
+      );
+  }
+  
+  buttons
+    .push(    Space::with_height(Length::Fill))
+    .push(tab_button(Bootstrap::Gear, "Settings", Some(Message::ToSettings), matches!(active_view, View::Settings(_))))
     .spacing(8.0)
     .into()
 }
@@ -218,7 +233,7 @@ pub fn error_box<'a>(message: String) -> Element<'a, Message> {
     .into()
 }
 
-fn installation_prompt<'a>(confirmation_prompt: &InstallConfirmationPrompt) -> Element<'a, Message> {
+fn installation_prompt<'a>(confirmation_prompt: &'a InstallConfirmationPrompt) -> Element<'a, Message> {
   let warning: Option<iced::widget::Container<Message, Theme>> = if confirmation_prompt.plugin.dependencies.contains(&PluginDependency::Dangerous) {
     Some(
       container(
@@ -231,6 +246,20 @@ fn installation_prompt<'a>(confirmation_prompt: &InstallConfirmationPrompt) -> E
     None
   };
 
+  let info_box = |title: &'static str, content: Element<'a, Message>| -> Element<'a, Message> {
+    container(
+      column![
+        text(title).size(20).font(bold()).class(Text::Shade(Shade::S200)),
+        content,
+      ]
+        .spacing(8)
+    )
+      .class(Container::Shade(Shade::S900))
+      .width(Length::Fill)
+      .padding(12)
+      .into()
+  };
+
   container(
     container(
       column![
@@ -241,30 +270,30 @@ fn installation_prompt<'a>(confirmation_prompt: &InstallConfirmationPrompt) -> E
             Column::new()
               .push(text(format!("Are you sure you want to install the plugin '{}'.", confirmation_prompt.plugin.name.clone())))
               .push_maybe(warning)
-              .push(column![
-                  text("General Information").size(20),
+              .push(info_box(
+                "General Information",
+                column![
                   text(format!("Name: {}", confirmation_prompt.plugin.name.clone())),
                   text(format!("Authors: {}", confirmation_prompt.plugin.authors.clone().join(", "))),
                   text(format!("Version: {}", confirmation_prompt.plugin.version)),
                 ]
-                  .spacing(4))
-                  .push(column![
-                    text("Description").size(20),
-                    text(
-                      if confirmation_prompt.plugin.description.len() <= 0 {
-                        String::from("No description")
-                      } else {
-                        confirmation_prompt.plugin.description.clone()
-                      }
-                    ),
-                  ]
-                    .spacing(4))
-                    .push(column![
-                      text("Dependencies").size(20),
-                      dependencies_list(&confirmation_prompt.plugin.dependencies),
-                    ].spacing(4))
-                    .spacing(24)
-                    .padding(Padding{top: 0.0, right: 16.0, bottom: 0.0, left: 8.0}),
+                .spacing(4)
+                .into()
+              ))
+              .push(info_box(
+                "Description",
+                if confirmation_prompt.plugin.description.len() <= 0 {
+                  text("No description").into()
+                } else {
+                  markdown::view(&confirmation_prompt.parsed_description, markdown::Settings::default(), markdown::Style::from_palette(Palette::DARK)).map(Message::OpenUrl).into()
+                }
+              ))
+              .push(info_box(
+                "Dependencies",
+                dependencies_list(&confirmation_prompt.plugin.dependencies).into()
+              ))
+              .spacing(24)
+              .padding(Padding{top: 0.0, right: 16.0, bottom: 0.0, left: 8.0}),
           )
         )
           .height(Length::Fill)
