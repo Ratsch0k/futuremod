@@ -1,6 +1,6 @@
 use std::{
     cell::OnceCell,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex},
     thread, time,
 };
@@ -53,20 +53,7 @@ pub fn main(config: Config) {
         CONFIG = Some(config.clone());
     }
 
-    let plugins_directory = config
-        .plugins_directory
-        .clone()
-        .map(PathBuf::from)
-        .unwrap_or(match std::env::current_dir() {
-            Ok(path) => Path::join(&path, "plugins"),
-            Err(e) => {
-                error!(
-                    "could not determine mods directory: could not get the current directory: {:?}",
-                    e
-                );
-                panic!("could not get the current directory: {:?}", e);
-            }
-        });
+    let plugins_directory = PathBuf::from(&config.plugins_directory);
 
     // Initialize global plugin manager or panic
     match GlobalPluginManager::initialize(plugins_directory) {

@@ -1,4 +1,0 @@
-name = "Example Invincibility"
-version = "0.0.1"
-authors = ["Simon Kurz"]
-dependencies = ["game"]

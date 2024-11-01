@@ -1,12 +1,18 @@
 #![allow(dead_code)]
 use anyhow::anyhow;
 use config::Config;
-use log::Log;
+use directories::BaseDirs;
+use log::{debug, Log};
 use log4rs::{
     append::file::FileAppender,
     config::{Appender, Logger, Root},
 };
-use std::{ffi::c_void, fs, path, str::FromStr};
+use std::{
+    ffi::c_void,
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use util::suspend_all_other_threads;
 use windows::{
     core::{s, PCSTR},
@@ -28,6 +34,9 @@ mod util;
 extern crate lazy_static;
 
 static mut IS_ATTACHED: bool = false;
+
+/// Name of this project
+const NAME: &'static str = "futuremod";
 
 /// Main entry point to the DLL.
 ///
@@ -73,13 +82,43 @@ unsafe fn detach() {
     OutputDebugStringA(s!("Detached rust dll"));
 }
 
+/// Get the default data directory where futuremod stores data.
+/// This should always return `C:\Users\<user>\AppData\Roaming\futuremod`.
+fn get_data_directory() -> Result<PathBuf, anyhow::Error> {
+    BaseDirs::new()
+        .ok_or(anyhow!("Could not get default directories"))
+        .map(|d| Path::join(d.config_dir(), NAME))
+}
+
+/// Ensures FutureMod's data folder is initialized.
+fn initialize_data_directories() -> Result<(), anyhow::Error> {
+    debug!("Initalizing data directories");
+    let data_dir = get_data_directory()?;
+
+    // Create the data directory itself
+    if !data_dir.exists() {
+        fs::create_dir(&data_dir).map_err(|e| anyhow!("Could not create data directory: {}", e))?;
+    }
+
+    // Create the required sub directories
+    let plugins_dir = Path::join(&data_dir, "plugins");
+    if !plugins_dir.exists() {
+        fs::create_dir(plugins_dir)
+            .map_err(|e| anyhow!("Could not create plugins directory: {}", e))?;
+    }
+
+    Ok(())
+}
+
 fn read_config() -> Result<Config, anyhow::Error> {
-    let config_path = path::Path::new("config.json");
+    let config_path = Path::join(&get_data_directory()?, "config.json");
 
     if !config_path.exists() {
+        debug_output("Config file doesn't exist, using default config");
         return Ok(Config::default());
     }
 
+    debug_output(format!("Reading config from '{}'", config_path.display()));
     let config_content_opt = fs::read_to_string(config_path);
 
     let config_content = match config_content_opt {
@@ -93,7 +132,22 @@ fn read_config() -> Result<Config, anyhow::Error> {
     }
 }
 
+fn debug_output(message: impl AsRef<str>) {
+    unsafe {
+        OutputDebugStringA(PCSTR(format!("{}\0", message.as_ref()).as_ptr()));
+    }
+}
+
+fn output_and_panic(message: impl AsRef<str>) {
+    debug_output(&message);
+    panic!("{}", message.as_ref());
+}
+
 unsafe extern "system" fn main(_: *mut c_void) -> u32 {
+    if let Err(e) = initialize_data_directories() {
+        output_and_panic(e.to_string());
+    }
+
     let config = match read_config() {
         Err(e) => {
             OutputDebugStringA(PCSTR(

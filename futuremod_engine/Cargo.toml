@@ -36,6 +36,7 @@ toml = "0.8.10"
 walkdir = "2.4.0"
 zip = "0.6.6"
 junction = "1.2.0"
+directories = "5.0.1"
 
 [dependencies.mlua]
 version = "0.9.1"
