@@ -1,31 +1,55 @@
-use std::{collections::HashMap, path::{Path, PathBuf}, sync::{Arc, RwLock}, thread::JoinHandle, time::SystemTime};
-use anyhow::{Error, anyhow};
+use anyhow::{anyhow, Error};
 use axum::{
-    body::Bytes, extract::{ws::{Message, WebSocket, WebSocketUpgrade}, BodyStream}, http::StatusCode, response::{IntoResponse, Response}, routing::{get, post, put}, BoxError, Json, Router,
+    body::Bytes,
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        BodyStream,
+    },
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::{get, post, put},
+    BoxError, Json, Router,
 };
 use futuremod_data::plugin::PluginInfo;
+use futures::Stream;
+use futures::TryStreamExt;
 use kv::Key;
 use log::*;
-use serde::{Serialize, Deserialize};
-use tokio::{fs, io, runtime::Runtime, sync::broadcast::{self, Receiver, Sender}};
-use std::thread;
-use futures::Stream;
 use rand::distributions::{Alphanumeric, DistString};
-use futures::TryStreamExt;
+use serde::{Deserialize, Serialize};
+use std::thread;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::{Arc, RwLock},
+    thread::JoinHandle,
+    time::SystemTime,
+};
+use tokio::{
+    fs, io,
+    runtime::Runtime,
+    sync::broadcast::{self, Receiver, Sender},
+};
 use tokio::{fs::File, io::BufWriter};
 use tokio_util::io::StreamReader;
 
-use crate::{config::Config, plugins::{plugin_info::{load_plugin_info, PluginInfoError}, plugin_manager::{GlobalPluginManager, PluginInstallError}}};
+use crate::{
+    config::Config,
+    plugins::{
+        plugin_info::{load_plugin_info, PluginInfoError},
+        plugin_manager::{GlobalPluginManager, PluginInstallError},
+    },
+};
 
-use super::plugins::{PluginManager, plugin_manager::PluginManagerError};
+use super::plugins::{plugin_manager::PluginManagerError, PluginManager};
 
 lazy_static! {
     pub static ref LOG_PUBLISHER: LogPublisher = LogPublisher::new();
-    static ref LOG_HISTORY: Arc<RwLock<Vec<(u64, LogRecord)>>> =  Arc::new(RwLock::new(Vec::new()));
+    static ref LOG_HISTORY: Arc<RwLock<Vec<(u64, LogRecord)>>> = Arc::new(RwLock::new(Vec::new()));
 }
 
 /// Start the mod server in a separate thread.
-/// 
+///
 /// Returns the thread's handle.
 pub fn start_server(config: Config) -> JoinHandle<()> {
     let handle = thread::spawn(move || {
@@ -54,22 +78,24 @@ fn serve(config: Config) -> Result<(), Error> {
                 .route("/plugin/info", put(get_plugin_info))
                 .route("/log", get(log_handler));
 
-            axum::Server::bind(&format!("{}:{}", config.server.host, config.server.port).parse().unwrap())
-                .serve(app.into_make_service())
-                .await
-                .unwrap();
+            axum::Server::bind(
+                &format!("{}:{}", config.server.host, config.server.port)
+                    .parse()
+                    .unwrap(),
+            )
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
         });
     });
 
     match result {
         Err(_) => Err(anyhow!("The server panicked")),
-        _ => Ok(())
+        _ => Ok(()),
     }
 }
 
-async fn log_handler(
-    ws: WebSocketUpgrade,
-) -> impl IntoResponse {
+async fn log_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
     debug!("Registering new log consumer");
     ws.on_upgrade(handle_log)
 }
@@ -85,10 +111,9 @@ async fn handle_log(mut socket: WebSocket) {
         for (record_id, log_record) in log_history.iter() {
             copy_of_log_history.push((*record_id, log_record.clone()));
         }
-        
+
         (last_seen_id_of_history, copy_of_log_history)
     };
-    
 
     for record in log_history.iter() {
         let log_json_message = match serde_json::to_string(&record.1) {
@@ -101,10 +126,9 @@ async fn handle_log(mut socket: WebSocket) {
             Err(e) => {
                 warn!("Could not send log record: {}", e);
                 return;
-            },
+            }
         }
     }
-
 
     while let Ok((id, message)) = log_receiver.recv().await {
         let message = match serde_json::to_string(&message) {
@@ -153,9 +177,7 @@ async fn read_memory(Json(payload): Json<ReadMemory>) -> (StatusCode, Json<Memor
             raw_bytes.push(*(raw_address.offset(i as isize)));
         }
 
-        memory = Memory {
-            value: raw_bytes,
-        }
+        memory = Memory { value: raw_bytes }
     }
 
     (StatusCode::OK, Json(memory))
@@ -175,14 +197,14 @@ impl IntoResponse for AppError {
     }
 }
 
-
-impl<E> From<E> for AppError where E: Into<anyhow::Error> {
+impl<E> From<E> for AppError
+where
+    E: Into<anyhow::Error>,
+{
     fn from(value: E) -> Self {
         AppError(value.into())
     }
 }
-
-
 
 async fn read_memory_hex(Json(payload): Json<ReadMemoryHex>) -> impl IntoResponse {
     let memory;
@@ -199,29 +221,31 @@ async fn read_memory_hex(Json(payload): Json<ReadMemoryHex>) -> impl IntoRespons
             raw_bytes.push(*(raw_address.offset(i as isize)));
         }
 
-        memory = Memory {
-            value: raw_bytes,
-        }
+        memory = Memory { value: raw_bytes }
     }
 
     Ok(Json(memory))
 }
 
 fn with_plugin_manager_mut<F, R>(f: F) -> Result<R, AppError>
-where F: Fn(&mut PluginManager) -> R {
+where
+    F: Fn(&mut PluginManager) -> R,
+{
     match GlobalPluginManager::get().lock() {
-        Ok(mut plugin_manager) => {
-            Ok(f(&mut plugin_manager))
-        },
-        Err(e) => Err(AppError(anyhow!("could not get lock to plugin manager: {:?}", e))),
+        Ok(mut plugin_manager) => Ok(f(&mut plugin_manager)),
+        Err(e) => Err(AppError(anyhow!(
+            "could not get lock to plugin manager: {:?}",
+            e
+        ))),
     }
 }
 
-fn with_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error> where F: Fn(&PluginManager) -> Result<R, anyhow::Error> {
+fn with_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error>
+where
+    F: Fn(&PluginManager) -> Result<R, anyhow::Error>,
+{
     match GlobalPluginManager::get().lock() {
-        Ok(mut plugin_manager) => {
-            Ok(f(&mut plugin_manager)?)
-        },
+        Ok(mut plugin_manager) => Ok(f(&mut plugin_manager)?),
         Err(e) => Err(anyhow!("Could not get lock to plugin manager: {:?}", e)),
     }
 }
@@ -237,7 +261,8 @@ async fn get_plugins() -> Result<Json<HashMap<String, futuremod_data::plugin::Pl
         }
 
         Ok(Json(plugin_response))
-    }).map_err(|e| e.to_string())
+    })
+    .map_err(|e| e.to_string())
 }
 
 #[derive(Deserialize)]
@@ -249,12 +274,16 @@ async fn enable_plugin(Json(payload): Json<PluginByName>) -> impl IntoResponse {
     with_plugin_manager_mut(|plugin_manager| -> Response {
         match plugin_manager.enable_plugin(&payload.name) {
             Err(e) => match e {
-                PluginManagerError::PluginNotFound => {
-                    (StatusCode::NOT_FOUND, AppError(anyhow!("plugin doesn't exist"))).into_response()
-                },
-                e => {
-                    (StatusCode::INTERNAL_SERVER_ERROR, AppError(anyhow!("could not enable plugin: {:?}", e))).into_response()
-                }
+                PluginManagerError::PluginNotFound => (
+                    StatusCode::NOT_FOUND,
+                    AppError(anyhow!("plugin doesn't exist")),
+                )
+                    .into_response(),
+                e => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError(anyhow!("could not enable plugin: {:?}", e)),
+                )
+                    .into_response(),
             },
             _ => StatusCode::NO_CONTENT.into_response(),
         }
@@ -265,12 +294,16 @@ async fn disable_plugin(Json(payload): Json<PluginByName>) -> impl IntoResponse 
     with_plugin_manager_mut(|plugin_manager| -> Response {
         match plugin_manager.disable_plugin(&payload.name) {
             Err(e) => match e {
-                PluginManagerError::PluginNotFound => {
-                    (StatusCode::NOT_FOUND, AppError(anyhow!("plugin doesn't exist"))).into_response()
-                },
-                e => {
-                    (StatusCode::INTERNAL_SERVER_ERROR, AppError(anyhow!("could not enable plugin: {:?}", e))).into_response()
-                }
+                PluginManagerError::PluginNotFound => (
+                    StatusCode::NOT_FOUND,
+                    AppError(anyhow!("plugin doesn't exist")),
+                )
+                    .into_response(),
+                e => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError(anyhow!("could not enable plugin: {:?}", e)),
+                )
+                    .into_response(),
             },
             _ => StatusCode::NO_CONTENT.into_response(),
         }
@@ -281,11 +314,17 @@ async fn reload_plugin(Json(payload): Json<PluginByName>) -> impl IntoResponse {
     with_plugin_manager_mut(|plugin_manager| -> Response {
         match plugin_manager.reload_plugin(&payload.name) {
             Err(e) => match e {
-                PluginManagerError::PluginNotFound => {
-                    (StatusCode::NOT_FOUND, AppError(anyhow!("plugin doesn't exist"))).into_response()
-                },
-                e => (StatusCode::INTERNAL_SERVER_ERROR, AppError(anyhow!("could not reload plugin: {:?}", e))).into_response(),
-            }
+                PluginManagerError::PluginNotFound => (
+                    StatusCode::NOT_FOUND,
+                    AppError(anyhow!("plugin doesn't exist")),
+                )
+                    .into_response(),
+                e => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError(anyhow!("could not reload plugin: {:?}", e)),
+                )
+                    .into_response(),
+            },
             _ => StatusCode::NO_CONTENT.into_response(),
         }
     })
@@ -298,7 +337,6 @@ enum InstallError {
     Other(String),
 }
 
-
 async fn get_plugin_info(request: BodyStream) -> (StatusCode, Result<Json<PluginInfo>, String>) {
     info!("Get plugin info");
 
@@ -306,15 +344,25 @@ async fn get_plugin_info(request: BodyStream) -> (StatusCode, Result<Json<Plugin
     let mut random_file_path = PathBuf::from(random_file_name);
     random_file_path.set_extension("zip");
 
-    let fcop_temp_folder = Path::new(&std::env::temp_dir()).join(PathBuf::from(TEMPORARY_DIRECTORY));
+    let fcop_temp_folder =
+        Path::new(&std::env::temp_dir()).join(PathBuf::from(TEMPORARY_DIRECTORY));
     if !fcop_temp_folder.exists() {
         if let Err(err) = fs::create_dir(&fcop_temp_folder).await {
-            return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Could not create temporary directory for fcop mod: {}", err.to_string())));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Err(format!(
+                    "Could not create temporary directory for fcop mod: {}",
+                    err.to_string()
+                )),
+            );
         }
     }
 
     let temporary_file_path = fcop_temp_folder.join(&random_file_path);
-    debug!("Storing incoming plugin package in temporary file: {}", temporary_file_path.to_str().unwrap_or("unknown"));
+    debug!(
+        "Storing incoming plugin package in temporary file: {}",
+        temporary_file_path.to_str().unwrap_or("unknown")
+    );
 
     match write_to_temp_file(&temporary_file_path, request).await {
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(e.0.to_string())),
@@ -325,7 +373,15 @@ async fn get_plugin_info(request: BodyStream) -> (StatusCode, Result<Json<Plugin
     info!("Extracting plugin package");
     let temporary_plugin_folder = match extract_temp_file(&temporary_file_path).await {
         Err(e) => match e {
-            InstallError::ExtractionError(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Error while extracting the plugin package: {}", msg))),
+            InstallError::ExtractionError(msg) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Err(format!(
+                        "Error while extracting the plugin package: {}",
+                        msg
+                    )),
+                )
+            }
             InstallError::Other(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(msg)),
         },
         Ok(v) => v,
@@ -334,22 +390,47 @@ async fn get_plugin_info(request: BodyStream) -> (StatusCode, Result<Json<Plugin
     info!("Reading plugin information");
     let info = match load_plugin_info(&temporary_plugin_folder) {
         Err(err) => match err {
-            PluginInfoError::FileNotFound => return (StatusCode::BAD_REQUEST, Err("Plugin package doesn't contain a info file".to_string())),
-            PluginInfoError::Format(msg) => return (StatusCode::BAD_REQUEST, Err(format!("Plugin info file has invalid format: {}", msg))),
-            PluginInfoError::Other(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Unexpected error while reading the plugin's info file: {}", msg))),
+            PluginInfoError::FileNotFound => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Err("Plugin package doesn't contain a info file".to_string()),
+                )
+            }
+            PluginInfoError::Format(msg) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Err(format!("Plugin info file has invalid format: {}", msg)),
+                )
+            }
+            PluginInfoError::Other(msg) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Err(format!(
+                        "Unexpected error while reading the plugin's info file: {}",
+                        msg
+                    )),
+                )
+            }
         },
         Ok(v) => v,
     };
 
     info!("Deleting temporary plugin");
     match fs::remove_dir_all(temporary_plugin_folder).await {
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Error while deleting the temporarily created plugin: {:?}", e))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Err(format!(
+                    "Error while deleting the temporarily created plugin: {:?}",
+                    e
+                )),
+            )
+        }
         Ok(()) => (),
     };
 
     (StatusCode::OK, Ok(Json(info)))
 }
-
 
 async fn install_plugin(request: BodyStream) -> (StatusCode, Result<(), String>) {
     info!("Installing new plugin");
@@ -358,15 +439,25 @@ async fn install_plugin(request: BodyStream) -> (StatusCode, Result<(), String>)
     let mut random_file_path = PathBuf::from(random_file_name);
     random_file_path.set_extension("zip");
 
-    let fcop_temp_folder = Path::new(&std::env::temp_dir()).join(PathBuf::from(TEMPORARY_DIRECTORY));
+    let fcop_temp_folder =
+        Path::new(&std::env::temp_dir()).join(PathBuf::from(TEMPORARY_DIRECTORY));
     if !fcop_temp_folder.exists() {
         if let Err(err) = fs::create_dir(&fcop_temp_folder).await {
-            return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Could not create temporary directory for fcop mod: {}", err.to_string())));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Err(format!(
+                    "Could not create temporary directory for fcop mod: {}",
+                    err.to_string()
+                )),
+            );
         }
     }
 
     let temporary_file_path = fcop_temp_folder.join(&random_file_path);
-    debug!("Storing incoming plugin package in temporary file: {}", temporary_file_path.to_str().unwrap_or("unknown"));
+    debug!(
+        "Storing incoming plugin package in temporary file: {}",
+        temporary_file_path.to_str().unwrap_or("unknown")
+    );
 
     match write_to_temp_file(&temporary_file_path, request).await {
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("{:?}", e))),
@@ -377,7 +468,15 @@ async fn install_plugin(request: BodyStream) -> (StatusCode, Result<(), String>)
     info!("Extracting plugin package");
     let temporary_plugin_folder = match extract_temp_file(&temporary_file_path).await {
         Err(e) => match e {
-            InstallError::ExtractionError(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Error while extracting the plugin package: {}", msg))),
+            InstallError::ExtractionError(msg) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Err(format!(
+                        "Error while extracting the plugin package: {}",
+                        msg
+                    )),
+                )
+            }
             InstallError::Other(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(msg)),
         },
         Ok(v) => v,
@@ -386,9 +485,27 @@ async fn install_plugin(request: BodyStream) -> (StatusCode, Result<(), String>)
     info!("Reading plugin information");
     let info = match load_plugin_info(&temporary_plugin_folder) {
         Err(err) => match err {
-            PluginInfoError::FileNotFound => return (StatusCode::BAD_REQUEST, Err("Plugin package doesn't contain a info file".to_string())),
-            PluginInfoError::Format(msg) => return (StatusCode::BAD_REQUEST, Err(format!("Plugin info file has invalid format: {}", msg))),
-            PluginInfoError::Other(msg) => return (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Unexpected error while reading the plugin's info file: {}", msg))),
+            PluginInfoError::FileNotFound => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Err("Plugin package doesn't contain a info file".to_string()),
+                )
+            }
+            PluginInfoError::Format(msg) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Err(format!("Plugin info file has invalid format: {}", msg)),
+                )
+            }
+            PluginInfoError::Other(msg) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Err(format!(
+                        "Unexpected error while reading the plugin's info file: {}",
+                        msg
+                    )),
+                )
+            }
         },
         Ok(v) => v,
     };
@@ -402,19 +519,43 @@ async fn install_plugin(request: BodyStream) -> (StatusCode, Result<(), String>)
         Ok(result) => match result {
             Ok(()) => (StatusCode::OK, Ok(())),
             Err(err) => match err {
-                PluginInstallError::AlreadyInstalled => (StatusCode::BAD_REQUEST, Err("plugin is already installed".to_string())),
-                PluginInstallError::InvalidName => (StatusCode::BAD_REQUEST, Err("plugin has an invalid name".to_string())),
-                PluginInstallError::InfoFile(e) => (StatusCode::BAD_REQUEST, Err(format!("plugin package info error: {:?}", e))),
-                PluginInstallError::Plugin(e) => (StatusCode::BAD_REQUEST, Err(format!("Plugin was installed but immediately errored: {:?}", e))),
-                _ => (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Error while installing plugin: {:?}", err))),
-            }
-        }
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Err(format!("Error while installing plugin: {:?}", err))),
+                PluginInstallError::AlreadyInstalled => (
+                    StatusCode::BAD_REQUEST,
+                    Err("plugin is already installed".to_string()),
+                ),
+                PluginInstallError::InvalidName => (
+                    StatusCode::BAD_REQUEST,
+                    Err("plugin has an invalid name".to_string()),
+                ),
+                PluginInstallError::InfoFile(e) => (
+                    StatusCode::BAD_REQUEST,
+                    Err(format!("plugin package info error: {:?}", e)),
+                ),
+                PluginInstallError::Plugin(e) => (
+                    StatusCode::BAD_REQUEST,
+                    Err(format!(
+                        "Plugin was installed but immediately errored: {:?}",
+                        e
+                    )),
+                ),
+                _ => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Err(format!("Error while installing plugin: {:?}", err)),
+                ),
+            },
+        },
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Err(format!("Error while installing plugin: {:?}", err)),
+        ),
     }
 }
 
 async fn write_to_temp_file<S, E>(path_name: &PathBuf, stream: S) -> Result<(), AppError>
-where S: Stream<Item = Result<Bytes, E>>, E: Into<BoxError> {
+where
+    S: Stream<Item = Result<Bytes, E>>,
+    E: Into<BoxError>,
+{
     async {
         debug!("Start extracting to {:?}", path_name);
         // Convert the stream into an `AsyncRead`.
@@ -440,15 +581,19 @@ async fn extract_temp_file(path: &PathBuf) -> Result<PathBuf, InstallError> {
     let plugin_package = fs::File::open(path)
         .await
         .map_err(|err| InstallError::Other(err.to_string()))?
-        .into_std().await;
+        .into_std()
+        .await;
 
-    let mut archive = zip::ZipArchive::new(plugin_package).map_err(|err| InstallError::ExtractionError(err.to_string()))?;
+    let mut archive = zip::ZipArchive::new(plugin_package)
+        .map_err(|err| InstallError::ExtractionError(err.to_string()))?;
 
     let mut destination = path.clone();
     destination.set_extension("");
 
     // Actually extract the archive to the destination folder
-    archive.extract(&destination).map_err(|err| InstallError::ExtractionError(err.to_string()))?;
+    archive
+        .extract(&destination)
+        .map_err(|err| InstallError::ExtractionError(err.to_string()))?;
 
     Ok(destination)
 }
@@ -457,8 +602,16 @@ async fn uninstall_plugin(Json(payload): Json<PluginByName>) -> impl IntoRespons
     with_plugin_manager_mut(|plugin_manager| {
         match plugin_manager.uninstall_plugin(payload.name.as_str()) {
             Err(e) => match e {
-                PluginManagerError::PluginNotFound => return (StatusCode::NOT_FOUND, "plugin not found").into_response(),
-                _ => return (StatusCode::INTERNAL_SERVER_ERROR, format!("unexpected error: {:?}", e )).into_response(),
+                PluginManagerError::PluginNotFound => {
+                    return (StatusCode::NOT_FOUND, "plugin not found").into_response()
+                }
+                _ => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("unexpected error: {:?}", e),
+                    )
+                        .into_response()
+                }
             },
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
         }
@@ -476,8 +629,17 @@ async fn install_plugin_in_dev_mode(Json(payload): Json<PluginPath>) -> impl Int
     with_plugin_manager_mut(|plugin_manager: &mut PluginManager| {
         match plugin_manager.install_plugin_in_dev_mode(&path_buf) {
             Err(e) => match e {
-                PluginInstallError::InvalidPluginFolder => return (StatusCode::BAD_REQUEST, "folder does not contain a plugin").into_response(),
-                _ => return (StatusCode::INTERNAL_SERVER_ERROR, format!("unexpected error: {:?}", e)).into_response(),
+                PluginInstallError::InvalidPluginFolder => {
+                    return (StatusCode::BAD_REQUEST, "folder does not contain a plugin")
+                        .into_response()
+                }
+                _ => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("unexpected error: {:?}", e),
+                    )
+                        .into_response()
+                }
             },
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
         }
@@ -506,7 +668,10 @@ impl<'a> From<&log::Record<'a>> for LogRecord {
             target: value.target().to_string(),
             level: value.level().as_str().to_string(),
             timestamp: humantime::format_rfc3339_millis(SystemTime::now()).to_string(),
-            plugin: value.key_values().get(Key::from("plugin")).map(|value| value.to_string()),
+            plugin: value
+                .key_values()
+                .get(Key::from("plugin"))
+                .map(|value| value.to_string()),
         }
     }
 }
@@ -517,7 +682,7 @@ impl LogPublisher {
 
         LogPublisher {
             publisher: tx,
-            _base_rx: rx
+            _base_rx: rx,
         }
     }
 
@@ -542,7 +707,5 @@ impl Log for LogPublisher {
         let _ = self.publisher.send(message.clone());
     }
 
-    fn flush(&self) {
-        
-    }
+    fn flush(&self) {}
 }

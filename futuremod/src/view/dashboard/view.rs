@@ -4,116 +4,119 @@ use futuremod_data::plugin::{Plugin, PluginInfo};
 use iced::{widget::markdown, window::frames, Subscription, Task};
 use lilt::{Animated, Easing};
 
-use crate::{logs, view::{self, plugin_list}, widget::Element};
+use crate::{
+    logs,
+    view::{self, plugin_list},
+    widget::Element,
+};
 
 use super::{components, state};
 
-
 /// Main dashboard.
-/// 
+///
 /// After successfully injecting FutureMod into the game,
 /// the user is presented with this UI.
-/// It lists all installed plugins, and offers the user to 
+/// It lists all installed plugins, and offers the user to
 /// install new plugins, access the settings, logs and other
 /// functionality.
 #[derive(Debug, Clone)]
 pub struct Dashboard {
-  pub(super) is_developer: bool,
-  pub(super) plugins: HashMap<String, Plugin>,
-  pub(super) view: View,
-  pub(super) logs: logs::state::Logs,
-  pub(super) dialog: Option<Dialog>,
-  pub(super) sidebar_minimized: Animated<bool, Instant>,
+    pub(super) is_developer: bool,
+    pub(super) plugins: HashMap<String, Plugin>,
+    pub(super) view: View,
+    pub(super) logs: logs::state::Logs,
+    pub(super) dialog: Option<Dialog>,
+    pub(super) sidebar_minimized: Animated<bool, Instant>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Dialog {
-  InstallationPrompt(InstallConfirmationPrompt),
-  UninstallPrompt(String),
-  Error(String),
+    InstallationPrompt(InstallConfirmationPrompt),
+    UninstallPrompt(String),
+    Error(String),
 }
 
 #[derive(Debug, Clone)]
-pub enum View{
-  Logs(view::logs::Logs),
-  Plugin(view::plugin::Plugin),
-  PluginList(view::plugin_list::PluginList),
-  Settings(view::settings::Settings),
-  #[cfg(feature = "debug")]
-  Debug(view::debug::DebugPage),
+pub enum View {
+    Logs(view::logs::Logs),
+    Plugin(view::plugin::Plugin),
+    PluginList(view::plugin_list::PluginList),
+    Settings(view::settings::Settings),
+    #[cfg(feature = "debug")]
+    Debug(view::debug::DebugPage),
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-  ToPluginList,
-  PluginList(view::plugin_list::Message),
-  #[allow(unused)]
-  ToSettings,
-  Settings(view::settings::Message),
-  ToLogs,
-  Logs(view::logs::Message),
-  Plugin(view::plugin::Message),
-  EnableResponse(Result<(), String>),
-  DisableResponse(Result<(), String>),
-  #[allow(unused)]
-  Reload(String),
-  ReloadResponse(Result<(), String>),
-  #[allow(unused)]
-  Uninstall(String),
-  #[allow(unused)]
-  UninstallPrompt(String),
-  UninstallResponse(Result<(), String>),
-  LogEvent(logs::subscriber::Event),
-  GetPluginsResponse(Result<HashMap<String, Plugin>, String>),
-  ResetView,
-  OpenInstallConfirmationPromptDialog(Result<InstallConfirmationPrompt, String>),
-  ConfirmInstallation(InstallConfirmationPrompt),
-  InstallResponse(Result<(), String>),
-  InstallGetPlugins(Result<HashMap<String, Plugin>, String>),
-  #[allow(unused)]
-  OpenDialog(Dialog),
-  CloseDialog,
-  ToggleSidebar,
-  Tick,
-  OpenUrl(reqwest::Url),
-  #[cfg(feature = "debug")]
-  ToDebug,
-  #[cfg(feature = "debug")]
-  Debug(crate::view::debug::Message)
+    ToPluginList,
+    PluginList(view::plugin_list::Message),
+    #[allow(unused)]
+    ToSettings,
+    Settings(view::settings::Message),
+    ToLogs,
+    Logs(view::logs::Message),
+    Plugin(view::plugin::Message),
+    EnableResponse(Result<(), String>),
+    DisableResponse(Result<(), String>),
+    #[allow(unused)]
+    Reload(String),
+    ReloadResponse(Result<(), String>),
+    #[allow(unused)]
+    Uninstall(String),
+    #[allow(unused)]
+    UninstallPrompt(String),
+    UninstallResponse(Result<(), String>),
+    LogEvent(logs::subscriber::Event),
+    GetPluginsResponse(Result<HashMap<String, Plugin>, String>),
+    ResetView,
+    OpenInstallConfirmationPromptDialog(Result<InstallConfirmationPrompt, String>),
+    ConfirmInstallation(InstallConfirmationPrompt),
+    InstallResponse(Result<(), String>),
+    InstallGetPlugins(Result<HashMap<String, Plugin>, String>),
+    #[allow(unused)]
+    OpenDialog(Dialog),
+    CloseDialog,
+    ToggleSidebar,
+    Tick,
+    OpenUrl(reqwest::Url),
+    #[cfg(feature = "debug")]
+    ToDebug,
+    #[cfg(feature = "debug")]
+    Debug(crate::view::debug::Message),
 }
 
 #[derive(Debug, Clone)]
 pub struct InstallConfirmationPrompt {
-  pub plugin: PluginInfo,
-  pub parsed_description: Vec<markdown::Item>,
-  pub path: PathBuf,
-  pub in_developer_mode: bool,
+    pub plugin: PluginInfo,
+    pub parsed_description: Vec<markdown::Item>,
+    pub path: PathBuf,
+    pub in_developer_mode: bool,
 }
 
 impl Dashboard {
-  pub fn new(plugins: HashMap<String, Plugin>, is_developer: bool) -> Self {
-    Dashboard {
-      is_developer,
-      plugins,
-      view: View::PluginList(plugin_list::PluginList::new()),
-      logs: logs::state::Logs::default(),
-      dialog: None,
-      sidebar_minimized: Animated::new(false).duration(250.0).easing(Easing::EaseOut),
+    pub fn new(plugins: HashMap<String, Plugin>, is_developer: bool) -> Self {
+        Dashboard {
+            is_developer,
+            plugins,
+            view: View::PluginList(plugin_list::PluginList::new()),
+            logs: logs::state::Logs::default(),
+            dialog: None,
+            sidebar_minimized: Animated::new(false).duration(250.0).easing(Easing::EaseOut),
+        }
     }
-  }
 
-  pub fn update(&mut self, message: Message) -> Task<Message> {
-    state::update(self, message)
-  }
+    pub fn update(&mut self, message: Message) -> Task<Message> {
+        state::update(self, message)
+    }
 
-  pub fn view(&self) -> Element<'_, Message> {
-    components::dashboard(self)
-  }
+    pub fn view(&self) -> Element<'_, Message> {
+        components::dashboard(self)
+    }
 
-  pub fn subscription(&self) -> Subscription<Message> {
-    Subscription::batch([
-      Subscription::run(crate::logs::subscriber::connect).map(Message::LogEvent),
-      frames().map(|_| Message::Tick),
-    ])
-  }
+    pub fn subscription(&self) -> Subscription<Message> {
+        Subscription::batch([
+            Subscription::run(crate::logs::subscriber::connect).map(Message::LogEvent),
+            frames().map(|_| Message::Tick),
+        ])
+    }
 }

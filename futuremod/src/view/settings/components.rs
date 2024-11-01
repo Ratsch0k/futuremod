@@ -1,47 +1,56 @@
-use iced::{alignment::{Horizontal, Vertical}, border::Radius, widget::{button, column, container, row, text, text_input, toggler, Space}, Border, Length};
+use iced::{
+    alignment::{Horizontal, Vertical},
+    border::Radius,
+    widget::{button, column, container, row, text, text_input, toggler, Space},
+    Border, Length,
+};
 use iced_fonts::Bootstrap;
 
-use crate::{config::{Config, DEFAULT_CONFIG}, theme, widget::{icon_button, icon_with_size, Element}};
+use crate::{
+    config::{Config, DEFAULT_CONFIG},
+    theme,
+    widget::{icon_button, icon_with_size, Element},
+};
 
 use super::{Message, Settings};
 
 pub fn settings_overview<'a>(settings: &'a Settings, config: Config) -> Element<'a, Message> {
-  column![settings_heading(settings, &config)]
-    .push_maybe(settings.error.as_ref().map(|e| error_box(e)))
-    .push(settings_content(&settings))
-    .padding(16)
-    .spacing(32)
-    .into()
+    column![settings_heading(settings, &config)]
+        .push_maybe(settings.error.as_ref().map(|e| error_box(e)))
+        .push(settings_content(&settings))
+        .padding(16)
+        .spacing(32)
+        .into()
 }
 
 fn error_box<'a>(error: &'a String) -> Element<'a, Message> {
-  container(
-    column![
-      row![
-        icon_with_size(Bootstrap::ExclamationTriangle, 20),
-        text("Error").size(20),
-        Space::with_width(Length::Fill),
-        icon_button(Bootstrap::X)
-          .on_press(Message::ClearError)
-          .class(theme::Button::Text)
-          .padding([4.0, 8.0]),
-      ]
-        .spacing(8)
-        .align_y(Vertical::Center),
-      text(error),
-    ]
-      .spacing(4)
-  )
+    container(
+        column![
+            row![
+                icon_with_size(Bootstrap::ExclamationTriangle, 20),
+                text("Error").size(20),
+                Space::with_width(Length::Fill),
+                icon_button(Bootstrap::X)
+                    .on_press(Message::ClearError)
+                    .class(theme::Button::Text)
+                    .padding([4.0, 8.0]),
+            ]
+            .spacing(8)
+            .align_y(Vertical::Center),
+            text(error),
+        ]
+        .spacing(4),
+    )
     .padding(12)
     .class(theme::Container::Danger)
     .into()
 }
 
 fn settings_heading<'a>(settings: &'a Settings, config: &Config) -> Element<'a, Message> {
-  let settings_changed = settings != config;
-  let settings_not_default = *settings != *DEFAULT_CONFIG;
+    let settings_changed = settings != config;
+    let settings_not_default = *settings != *DEFAULT_CONFIG;
 
-  column![
+    column![
     row![
       text("Settings").size(24),
       Space::with_width(Length::Fill),
@@ -78,7 +87,7 @@ fn settings_heading<'a>(settings: &'a Settings, config: &Config) -> Element<'a, 
 }
 
 fn settings_content<'a>(settings: &'a Settings) -> Element<'a, Message> {
-  column![
+    column![
     settings_section(
       "Mod Path",
       "Set the path to the FutureMod engine DLL that is injected into the DLL.",
@@ -143,13 +152,17 @@ fn settings_content<'a>(settings: &'a Settings) -> Element<'a, Message> {
     .into()
 }
 
-fn settings_section<'a>(title: &'a str, description: &'a str, content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-  column![
-    text(title).size(20),
-    Space::with_height(8.0),
-    text(description),
-    Space::with_height(4.0),
-    content.into(),
-  ]
+fn settings_section<'a>(
+    title: &'a str,
+    description: &'a str,
+    content: impl Into<Element<'a, Message>>,
+) -> Element<'a, Message> {
+    column![
+        text(title).size(20),
+        Space::with_height(8.0),
+        text(description),
+        Space::with_height(4.0),
+        content.into(),
+    ]
     .into()
 }

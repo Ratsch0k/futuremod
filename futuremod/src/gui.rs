@@ -12,7 +12,7 @@ use super::view::loading;
 /// The state contains some global information as well as
 /// the current view.
 #[derive(Debug)]
-pub struct ModInjector{
+pub struct ModInjector {
     /// Wether the GUI is in developer mode
     is_developer: bool,
 
@@ -50,8 +50,9 @@ pub fn update(gui: &mut ModInjector, message: Message) -> Task<Message> {
     match &mut gui.current_view {
         View::Loading(loading) => {
             if let Message::Loading(loading::Message::GotPlugins(plugins)) = message {
-                gui.current_view = View::Dashboard(dashboard::Dashboard::new(plugins, gui.is_developer));
-                return Task::none()
+                gui.current_view =
+                    View::Dashboard(dashboard::Dashboard::new(plugins, gui.is_developer));
+                return Task::none();
             }
 
             if let Message::Loading(message) = message {
@@ -59,11 +60,9 @@ pub fn update(gui: &mut ModInjector, message: Message) -> Task<Message> {
             }
 
             Task::none()
-        },
+        }
         View::Dashboard(dashboard) => match message {
-            Message::Dashboard(message) => {
-                dashboard.update(message).map(Message::Dashboard)
-            },
+            Message::Dashboard(message) => dashboard.update(message).map(Message::Dashboard),
             _ => Task::none(),
         },
     }
@@ -92,7 +91,7 @@ impl ModInjector {
                 is_developer,
                 current_view: View::Loading(loading),
             },
-            message.map(Message::Loading)
+            message.map(Message::Loading),
         )
     }
 }

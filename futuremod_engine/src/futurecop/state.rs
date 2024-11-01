@@ -1,4 +1,8 @@
-use super::{global::{Global, VolatileGlobal, SelectedGameMode}, IN_GAME_LOOP, IS_TWO_PLAYER, IS_PLAYING, GAME_MODE, SCENE, FRAME_NUMBER, MAIN_WINDOW, HEAP, EVENTS, FUTURE_COP_MODULE};
+use super::{
+    global::{Global, SelectedGameMode, VolatileGlobal},
+    EVENTS, FRAME_NUMBER, FUTURE_COP_MODULE, GAME_MODE, HEAP, IN_GAME_LOOP, IS_PLAYING,
+    IS_TWO_PLAYER, MAIN_WINDOW, SCENE,
+};
 
 #[derive(Debug)]
 pub struct Mission {
@@ -15,7 +19,6 @@ pub struct WindowHandles {
     pub future_cop_module: VolatileGlobal<u32>,
     pub events: VolatileGlobal<u32>,
 }
-
 
 #[derive(Debug)]
 pub struct GameState {
@@ -50,5 +53,5 @@ pub static mut FUTURE_COP: FutureCopState = FutureCopState {
         heap: HEAP,
         future_cop_module: FUTURE_COP_MODULE,
         events: EVENTS,
-    }
+    },
 };

@@ -10,6 +10,6 @@ impl checkbox::Catalog for Theme {
     }
 
     fn style(&self, class: &Self::Class<'_>, status: checkbox::Status) -> checkbox::Style {
-      class(self, status)
+        class(self, status)
     }
 }

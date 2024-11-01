@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,13 +25,13 @@ pub struct Config {
 
     /// Fixed path to the plugins directory.
     /// By default this option is None.
-    /// 
+    ///
     /// If this is None, it will load plugins from the directory "plugins" within
     /// the games root directory. For example: `C:\\Program Files (x86)\\Electronic Arts\\Future Cop\\plugins`
     pub plugins_directory: Option<String>,
 
     /// Optional sprint config that specifies for both players their sprint key.
-    /// 
+    ///
     /// As the sprint mod should be shifted to an actual plugin this will be removed in the future.
     pub sprint_config: Option<SprintConfig>,
 }

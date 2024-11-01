@@ -1,14 +1,19 @@
-use iced::{widget::{column, container, scrollable, text}, Task};
+use iced::{
+    widget::{column, container, scrollable, text},
+    Task,
+};
 
-use crate::{palette::{BaseColor, Shade}, theme::Container, widget::{bold, Element}};
+use crate::{
+    palette::{BaseColor, Shade},
+    theme::Container,
+    widget::{bold, Element},
+};
 
 #[derive(Debug, Clone)]
 pub struct DebugPage;
 
 #[derive(Debug, Clone)]
-pub enum Message {
-
-}
+pub enum Message {}
 
 impl DebugPage {
     pub fn new() -> Self {
@@ -18,11 +23,9 @@ impl DebugPage {
     pub fn update(&mut self, _message: Message) -> Task<Message> {
         Task::none()
     }
-    
+
     pub fn view<'a>(&self) -> Element<'a, Message> {
-        let padded_container = |content: Element<'a, Message>| {
-            container(content).padding(12)
-        };
+        let padded_container = |content: Element<'a, Message>| container(content).padding(12);
 
         scrollable(
             column![
@@ -158,7 +161,6 @@ impl DebugPage {
                         .into()
                 )
                 .class(Container::Shade(Shade::S950)),
-                        
             ]
                 .padding(12)
                 .spacing(8)

@@ -1,18 +1,19 @@
 use std::time::Duration;
 
-use async_tungstenite::{WebSocketStream, tungstenite};
-use iced::{futures::{self, channel::mpsc}, stream};
-use futures::{sink::SinkExt, Stream};
+use async_tungstenite::{tungstenite, WebSocketStream};
 use futures::stream::StreamExt;
+use futures::{sink::SinkExt, Stream};
+use iced::{
+    futures::{self, channel::mpsc},
+    stream,
+};
 use log::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
 use crate::config;
 
-
 const BUFFER_TIME: usize = 100;
-
 
 #[derive(Debug, Clone)]
 pub enum Event {
@@ -22,7 +23,11 @@ pub enum Event {
 }
 
 pub enum State {
-    Connected(WebSocketStream<async_tungstenite::tokio::ConnectStream>, mpsc::Receiver<Event>, Instant),
+    Connected(
+        WebSocketStream<async_tungstenite::tokio::ConnectStream>,
+        mpsc::Receiver<Event>,
+        Instant,
+    ),
     Disconnected,
 }
 
@@ -32,79 +37,76 @@ pub struct LogRecord {
     pub message: String,
     pub level: String,
     pub timestamp: String,
-    pub plugin: Option<String>
+    pub plugin: Option<String>,
 }
 
 pub fn connect() -> impl Stream<Item = Event> {
     let config = config::get();
     let base_address = config.mod_address.clone();
 
-    stream::channel(
-        100,
-        |mut output| async move {
-            let mut state = State::Disconnected;
+    stream::channel(100, |mut output| async move {
+        let mut state = State::Disconnected;
 
-            loop {
-                match &mut state {
-                    State::Disconnected => {
-                        match async_tungstenite::tokio::connect_async(
-                            format!("ws://{base_address}/log")
-                        )
-                        .await
-                        {
-                            Ok((websocket, _)) => {
-                                info!("Connected to log websocket");
-                                let (_sender, receiver) = mpsc::channel(BUFFER_TIME);
-                                let _ = output.send(Event::Connected).await;
+        loop {
+            match &mut state {
+                State::Disconnected => {
+                    match async_tungstenite::tokio::connect_async(format!(
+                        "ws://{base_address}/log"
+                    ))
+                    .await
+                    {
+                        Ok((websocket, _)) => {
+                            info!("Connected to log websocket");
+                            let (_sender, receiver) = mpsc::channel(BUFFER_TIME);
+                            let _ = output.send(Event::Connected).await;
 
-                                state = State::Connected(websocket, receiver, Instant::now());
-                            }
-                            Err(e) => {
-                                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                            state = State::Connected(websocket, receiver, Instant::now());
+                        }
+                        Err(e) => {
+                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-                                warn!("Could not connect to log websocket: {}", e);
+                            warn!("Could not connect to log websocket: {}", e);
 
-                                state = State::Disconnected;
-                                let _ = output.send(Event::Disconnected).await;
-                            }
+                            state = State::Disconnected;
+                            let _ = output.send(Event::Disconnected).await;
                         }
                     }
-                    State::Connected(websocket, _input, last_flush) => {
-                        let mut fused_websocket = websocket.by_ref().fuse();
+                }
+                State::Connected(websocket, _input, last_flush) => {
+                    let mut fused_websocket = websocket.by_ref().fuse();
 
-                        futures::select! {
-                            received = fused_websocket.select_next_some() => {
-                                match received {
-                                    Ok(tungstenite::Message::Text(message)) => {
-                                        match serde_json::from_str::<LogRecord>(message.as_str()) {
-                                            Ok(record) => {
-                                                let _ = output.feed(Event::Message(record)).await;
+                    futures::select! {
+                        received = fused_websocket.select_next_some() => {
+                            match received {
+                                Ok(tungstenite::Message::Text(message)) => {
+                                    match serde_json::from_str::<LogRecord>(message.as_str()) {
+                                        Ok(record) => {
+                                            let _ = output.feed(Event::Message(record)).await;
 
-                                                let now = Instant::now();
-                                                if now.duration_since(*last_flush) >= Duration::from_millis(100) {
-                                                    if let Err(err) = output.flush().await {
-                                                        warn!("Could not flush pending message: {}", err.to_string());
-                                                    }
+                                            let now = Instant::now();
+                                            if now.duration_since(*last_flush) >= Duration::from_millis(100) {
+                                                if let Err(err) = output.flush().await {
+                                                    warn!("Could not flush pending message: {}", err.to_string());
                                                 }
-                                            },
-                                            Err(e) => {
-                                                warn!("Could not parse incoming log record: {:?}", e);
                                             }
+                                        },
+                                        Err(e) => {
+                                            warn!("Could not parse incoming log record: {:?}", e);
                                         }
-                                    },
-                                    Err(e) => {
-                                        warn!("Error occurred while processing log messages: {}", e.to_string());
-                                        state = State::Disconnected;
-                                        let _ = output.send(Event::Disconnected).await;
-                                    },
-                                    Ok(_) => (),
-                                }
-                            },
-                            complete => (),
-                        }
-                    },
+                                    }
+                                },
+                                Err(e) => {
+                                    warn!("Error occurred while processing log messages: {}", e.to_string());
+                                    state = State::Disconnected;
+                                    let _ = output.send(Event::Disconnected).await;
+                                },
+                                Ok(_) => (),
+                            }
+                        },
+                        complete => (),
+                    }
                 }
             }
         }
-    )
+    })
 }

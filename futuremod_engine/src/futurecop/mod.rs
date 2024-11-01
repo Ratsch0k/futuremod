@@ -5,19 +5,18 @@ use global::*;
 
 pub(crate) mod state;
 
-
 ///////////////////////////////////////////////////////////
 // Known addresses
 ///////////////////////////////////////////////////////////
 pub const PLAYER_ARRAY_ADDR: u32 = 0x00511fd0;
-
 
 ///////////////////////////////////////////////////////////
 // Enums
 ///////////////////////////////////////////////////////////
 #[derive(Debug, Default)]
 pub enum GameMode {
-    #[default] CrimeWar,
+    #[default]
+    CrimeWar,
     PrecinctAssault,
 }
 
@@ -27,13 +26,12 @@ impl fmt::Display for &GameMode {
     }
 }
 
-
 ///////////////////////////////////////////////////////////
 // Statics
 ///////////////////////////////////////////////////////////
 pub static IN_GAME_LOOP: VolatileGlobal<bool> = VolatileGlobal::new(0x004c987c);
-pub static IS_TWO_PLAYER: VolatileGlobal::<bool> = VolatileGlobal::new(0x00511f54);
-pub static IS_PLAYING: VolatileGlobal::<bool> = VolatileGlobal::new(0x00486248);
+pub static IS_TWO_PLAYER: VolatileGlobal<bool> = VolatileGlobal::new(0x00511f54);
+pub static IS_PLAYING: VolatileGlobal<bool> = VolatileGlobal::new(0x00486248);
 pub static GAME_MODE: SelectedGameMode = SelectedGameMode::new(0x00511e03);
 pub static SCENE: VolatileGlobal<u8> = VolatileGlobal::new(0x00511fb8);
 pub static FRAME_NUMBER: VolatileGlobal<u32> = VolatileGlobal::new(0x00511f40);
@@ -47,7 +45,6 @@ pub static SURFACE: VolatileGlobal<u32> = VolatileGlobal::new(0x00511f64);
 pub static SURFACE_COPY: VolatileGlobal<u32> = VolatileGlobal::new(0x00511dc4);
 pub static mut RENDER_ITEMS: VolatileGlobal<u32> = VolatileGlobal::new(0x00511dc0);
 
-
 ///////////////////////////////////////////////////////////
 // Function Types
 ///////////////////////////////////////////////////////////
@@ -58,10 +55,9 @@ pub type VoidFunction = unsafe fn();
 pub type RenderCharacterFunction = unsafe fn(u32, u32, u32, u32) -> u32;
 pub type RenderTextFunction = unsafe fn(*const u8, u32, u32, u32);
 pub type RenderRectangleFunction = unsafe fn(u32, u16, u16, u16, u16, u8);
-pub type UpdateFunction = unsafe fn (u32, u32, u32) -> u32;
-pub type RenderObjectRaw = unsafe fn (u32, u32, u32);
-pub type RenderObject = unsafe fn (u32, *mut u32, u32);
-
+pub type UpdateFunction = unsafe fn(u32, u32, u32) -> u32;
+pub type RenderObjectRaw = unsafe fn(u32, u32, u32);
+pub type RenderObject = unsafe fn(u32, *mut u32, u32);
 
 ///////////////////////////////////////////////////////////
 // Function Addresses
@@ -76,7 +72,6 @@ pub const UPDATE_FUNCTION_BEHAVIOR_0XA0_ADDRESS: u32 = 0x0041a420;
 pub const RENDER_OBJECT_ADDRESS: u32 = 0x004284b0;
 pub const FUN_004280A0_ADDRESS: u32 = 0x004280a0;
 
-
 ///////////////////////////////////////////////////////////
 // Functions
 ///////////////////////////////////////////////////////////
@@ -87,9 +82,9 @@ macro_rules! fn_cast {
 }
 
 pub fn render_character(character: u32, pos_x: u32, pos_y: u32, palette: u32) -> u32 {
-    let fn_ptr = RENDER_CHARACTER_FUNCTION_ADDRESS as *const();
+    let fn_ptr = RENDER_CHARACTER_FUNCTION_ADDRESS as *const ();
     unsafe {
-        let render_character_fn = {std::mem::transmute::<_, RenderCharacterFunction>(fn_ptr)};
+        let render_character_fn = { std::mem::transmute::<_, RenderCharacterFunction>(fn_ptr) };
         render_character_fn(character, pos_x, pos_y, palette)
     }
 }
@@ -99,10 +94,16 @@ pub fn render_text(text: *const u8, pos_x: u32, pos_y: u32, palette: u32) {
         let render_text_fn = fn_cast!(RENDER_TEXT_FUNCTION_ADDRESS, RenderTextFunction);
         render_text_fn(text, pos_x, pos_y, palette);
     }
-
 }
 
-pub fn render_rectangle(color: u32, pos_x: u16, pos_y: u16, width: u16, height: u16, semi_transparent: u8) {
+pub fn render_rectangle(
+    color: u32,
+    pos_x: u16,
+    pos_y: u16,
+    width: u16,
+    height: u16,
+    semi_transparent: u8,
+) {
     unsafe {
         let render_rect_fn = fn_cast!(RENDRE_RECTANGLE_FUNCTION_ADDRESS, RenderRectangleFunction);
         render_rect_fn(color, pos_x, pos_y, width, height, semi_transparent);
@@ -115,7 +116,6 @@ pub fn update_function_behavior_0xa0(arg1: u32, arg2: u32, arg3: u32) -> u32 {
         update_fn(arg1, arg2, arg3)
     }
 }
-
 
 pub fn render_object_raw(arg1: u32, arg2: u32, arg3: u32) {
     unsafe {
@@ -150,7 +150,7 @@ pub struct Player {
     pub field_00_0f: u128,
     pub field_10_11: u16,
     pub field_12_13: u16,
-    pub enemies_killed: u16, 
+    pub enemies_killed: u16,
     pub deaths: u16,
     pub field_18_1f: u64,
     pub field_20_2f: u128,
@@ -265,7 +265,7 @@ pub struct PlayerEntity {
     pub unknown12: u128,
     pub unknown13: u128,
     pub unknown14: u64,
-    pub rotation:  i32,
+    pub rotation: i32,
     pub player: *mut Player,
     pub unknown15: u32,
     pub unknown16_0: u32,
@@ -283,10 +283,9 @@ pub struct PlayerEntity {
     pub unknown23: u128,
 }
 
-
 impl PlayerEntity {
     /// Create PlayerEntity from the given address.
-    /// 
+    ///
     /// This functions basically takes the address and casts it into a mutable pointer
     /// to a PlayerEntity instance residing at the memory address.
     /// `address` **must** point to a valid instance.
@@ -298,7 +297,6 @@ impl PlayerEntity {
     }
 }
 
-
 #[derive(Debug)]
 #[repr(C)]
 pub struct Position {
@@ -306,7 +304,6 @@ pub struct Position {
     pub y: u32,
     pub z: u32,
 }
-
 
 /// Represents basic entity/actor data.
 /// Used by behavior `0xa0`.

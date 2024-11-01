@@ -1,5 +1,5 @@
-pub mod view;
 pub mod components;
 pub mod state;
+pub mod view;
 
-pub use view::{Settings, Message};
+pub use view::{Message, Settings};
