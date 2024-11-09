@@ -1,5 +1,4 @@
 use std::{
-    cell::Ref,
     fmt,
     marker::PhantomData,
     mem::size_of,
@@ -16,7 +15,6 @@ use num::{
     traits::{FromBytes, ToBytes},
     Num, One, Zero,
 };
-use windows::System::User;
 
 use super::LuaResult;
 

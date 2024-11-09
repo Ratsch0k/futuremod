@@ -1,12 +1,12 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::Arc,
 };
 
 use anyhow::anyhow;
-use log::{debug, info};
+use log::debug;
 use mlua::{AnyUserData, Lua, Table, UserData};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::LuaResult;
 

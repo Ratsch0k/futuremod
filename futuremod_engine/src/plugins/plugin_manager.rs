@@ -168,7 +168,7 @@ impl PluginManager {
     pub fn new(plugins_directory: PathBuf) -> Result<Self, PluginManagerError> {
         let lua = Arc::new(Lua::new());
         if let Err(e) =
-            lua.load_from_std_lib(StdLib::STRING | StdLib::BIT | StdLib::MATH | StdLib::TABLE)
+            lua.load_std_libs(StdLib::STRING | StdLib::BIT | StdLib::MATH | StdLib::TABLE)
         {
             error!("Could not load subset of standard library: {}", e);
             return Err(PluginManagerError::Other(format!(

@@ -1,4 +1,4 @@
-use std::{cell::Ref, collections::HashMap};
+use std::collections::HashMap;
 
 use log::debug;
 use mlua::{AnyUserData, Lua, MetaMethod, ObjectLike, UserData, UserDataRef};
