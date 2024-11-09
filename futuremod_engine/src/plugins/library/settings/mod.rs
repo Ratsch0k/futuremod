@@ -5,8 +5,19 @@ use std::{
 
 use anyhow::anyhow;
 use log::debug;
-use mlua::{AnyUserData, Lua, Table, UserData};
-use serde::Serialize;
+use mlua::{Lua, Table, UserData};
+
+mod settings;
+mod button;
+mod section;
+mod text;
+
+pub use settings::PluginSettings;
+
+use settings::SettingsComponent;
+use button::{create_button, ButtonComponent};
+use text::{create_text, TextComponent};
+use section::SectionComponent;
 
 use super::LuaResult;
 
@@ -83,20 +94,6 @@ pub fn create_settings_table(lua: &Lua) -> Result<mlua::Value, mlua::Error> {
     Ok(mlua::Value::Table(library))
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum SettingsComponent {
-    Button(ButtonComponent),
-    Section(SectionComponent),
-    Text(TextComponent),
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct PluginSettings {
-    pub components: Vec<SettingsComponent>,
-}
-
-impl UserData for PluginSettings {}
 
 fn create_settings(lua: &Lua, components: Table) -> LuaResult<()> {
     debug!("Create settings from: {:?}", components);
@@ -184,112 +181,4 @@ pub fn get_settings(
     Ok(settings.settings.clone())
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct ButtonComponent {
-    text: String,
-    disabled: bool,
-    #[serde(skip)]
-    on_click: Option<mlua::Function>,
-    id: Option<String>,
-}
 
-fn create_button(_: &Lua, text: String) -> LuaResult<ButtonComponent> {
-    Ok(ButtonComponent::new(text))
-}
-
-impl ButtonComponent {
-    pub fn new(text: String) -> ButtonComponent {
-        debug!("Create button with text '{}'", text);
-
-        ButtonComponent {
-            text,
-            disabled: false,
-            on_click: None,
-            id: None,
-        }
-    }
-}
-
-impl UserData for ButtonComponent {
-    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_function("withText", |_, (builder, text): (AnyUserData, String)| {
-            debug!("Change button text to '{}'", text);
-            let builder = builder.borrow::<ButtonComponent>()?;
-            let mut new_buider = builder.clone();
-            new_buider.text = text;
-            Ok(new_buider)
-        });
-
-        methods.add_function(
-            "withDisabled",
-            |_, (builder, value): (AnyUserData, bool)| {
-                debug!("Change button disabled to '{}'", value);
-                let builder = builder.borrow::<ButtonComponent>()?;
-                let mut new_buider = builder.clone();
-                new_buider.disabled = value;
-                Ok(new_buider)
-            },
-        );
-
-        methods.add_function("withID", |_, (builder, id): (AnyUserData, String)| {
-            debug!("Change button ID to {}", id);
-            let builder = builder.borrow::<ButtonComponent>()?;
-            let mut new_buider = builder.clone();
-            new_buider.id = Some(id);
-            Ok(new_buider)
-        });
-
-        methods.add_function(
-            "onClick",
-            |_, (builder, cb): (AnyUserData, mlua::Function)| {
-                debug!("Change button on click listener to '{:?}'", cb);
-                let builder = builder.borrow::<ButtonComponent>()?;
-                let mut new_buider = builder.clone();
-                new_buider.on_click = Some(cb);
-                Ok(new_buider)
-            },
-        );
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct SectionComponent {
-    content: Vec<SettingsComponent>,
-}
-
-impl SectionComponent {
-    pub fn new(content: Vec<SettingsComponent>) -> SectionComponent {
-        SectionComponent { content }
-    }
-}
-
-impl UserData for SectionComponent {}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct TextComponent {
-    pub text: String,
-}
-
-fn create_text(_lua: &Lua, text: String) -> LuaResult<TextComponent> {
-    Ok(TextComponent::new(text))
-}
-
-impl TextComponent {
-    pub fn new(text: String) -> TextComponent {
-        TextComponent { text }
-    }
-}
-
-impl UserData for TextComponent {
-    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_function(
-            "withText",
-            |_, (text_component, text): (AnyUserData, String)| {
-                let original = text_component.borrow::<TextComponent>()?;
-                let mut new_component = original.clone();
-                new_component.text = text;
-                Ok(new_component)
-            },
-        );
-    }
-}
