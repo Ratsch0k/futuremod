@@ -10,7 +10,7 @@ mod native;
 use futuremod_hook::lua::hook_function;
 use memory::*;
 
-pub fn create_dangerous_library(lua: Arc<Lua>) -> Result<mlua::OwnedTable, mlua::Error> {
+pub fn create_dangerous_library(lua: Arc<Lua>) -> Result<mlua::Table, mlua::Error> {
     let table = lua.create_table()?;
 
     let hook_fn = lua.create_function(hook_function)?;
@@ -38,5 +38,5 @@ pub fn create_dangerous_library(lua: Arc<Lua>) -> Result<mlua::OwnedTable, mlua:
     let create_native_struct = lua.create_function(create_native_struct_fn)?;
     table.set("createNativeStruct", create_native_struct)?;
 
-    Ok(table.into_owned())
+    Ok(table)
 }

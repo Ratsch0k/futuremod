@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use log::debug;
-use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, OwnedTable, UserData};
+use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, Table, UserData};
 use serde::Serialize;
 
 use crate::futurecop::{self, global::GetterSetter, state::FUTURE_COP, PLAYER_ARRAY_ADDR};
@@ -44,7 +44,7 @@ struct PlayerEntity {
 }
 
 impl UserData for PlayerEntity {
-    fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+    fn add_fields<F: mlua::prelude::LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("health", |_, this| {
             Ok(unsafe { (*this.player_entity).health.health })
         });
@@ -102,13 +102,13 @@ impl UserData for PlayerEntity {
             Ok(())
         });
 
-        fn create_getter_setter<'lua, T, F>(
+        fn create_getter_setter<T, F>(
             name: &str,
             fields: &mut F,
             extractor: fn(*mut futurecop::PlayerEntity) -> *mut T,
         ) where
-            F: mlua::prelude::LuaUserDataFields<'lua, PlayerEntity>,
-            T: IntoLua<'lua> + FromLua<'lua> + 'static + Copy,
+            F: mlua::prelude::LuaUserDataFields<PlayerEntity>,
+            T: IntoLua + FromLua + 'static + Copy,
         {
             fields.add_field_method_get(name, move |_, this| {
                 let field: T;
@@ -190,7 +190,7 @@ impl UserData for PlayerEntity {
         });
     }
 
-    fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("getMaxHealth", |_, this, ()| {
             Ok(unsafe { (*this.player_entity).health.max_health })
         })
@@ -213,7 +213,7 @@ impl GameState {
     }
 }
 
-pub fn create_game_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
+pub fn create_game_library(lua: Arc<Lua>) -> Result<Table, mlua::Error> {
     let functions = lua.create_table()?;
 
     let get_game_state = lua.create_function(|lua, ()| {
@@ -248,5 +248,5 @@ pub fn create_game_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
     })?;
     functions.set("getPlayer", get_player)?;
 
-    Ok(functions.into_owned())
+    Ok(functions)
 }

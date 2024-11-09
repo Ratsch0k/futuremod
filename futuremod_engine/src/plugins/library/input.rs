@@ -2,7 +2,7 @@ use std::{str::FromStr, sync::Arc};
 
 use device_query::Keycode;
 use log::*;
-use mlua::{Lua, OwnedTable};
+use mlua::{Lua, Table};
 
 use crate::input::KeyState;
 
@@ -126,7 +126,7 @@ fn insert_keycode(table: &mlua::Table, code: Keycode) -> Result<(), mlua::Error>
     table.set(code.clone(), code)
 }
 
-pub fn create_input_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
+pub fn create_input_library(lua: Arc<Lua>) -> Result<Table, mlua::Error> {
     let library = lua.create_table()?;
 
     // Insert supported key codes into library table.
@@ -156,5 +156,5 @@ pub fn create_input_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
     })?;
     library.set("isKeyPressed", is_key_pressed_function)?;
 
-    Ok(library.into_owned())
+    Ok(library)
 }

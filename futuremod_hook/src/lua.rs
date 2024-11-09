@@ -10,8 +10,8 @@ use crate::native::{memory_copy, Hook};
 use crate::types::{lua_to_native, lua_to_native_implied, native_to_lua, Type};
 
 /// Create a hook on any function with a given lua function.
-pub fn hook_function<'lua>(
-    lua: &'lua Lua,
+pub fn hook_function(
+    lua: &Lua,
     (address, arg_type_names, return_type_name, callback): (u32, Vec<String>, String, Function),
 ) -> Result<Hook, mlua::Error> {
     debug!(
@@ -72,12 +72,12 @@ pub fn hook_function<'lua>(
             // 1. Convert the arguments from lua values into native values
             // 2. Call the original function with the arguments
             // 3. Convert the return value back to a lua value and return it
-            let original_wrapper = match lua.create_function::<_, mlua::Value, _>(
+            let original_wrapper = match lua.create_function::<_, _, mlua::Value>(
                 move |lua, args: MultiValue| {
                     debug!("Lua called original function");
 
                     // Convert the arguments from lua values into actual native values.
-                    let lua_args = args.into_vec();
+                    let lua_args: Vec<&mlua::Value> = args.iter().collect();
 
                     let mut converted_lua_args: Vec<u32> = Vec::new();
 
@@ -163,7 +163,7 @@ pub fn hook_function<'lua>(
             for i in 0..argument_types.len() {
                 let arg_type = argument_types[i];
 
-                match native_to_lua(lua, arg_type, *arg_pointer.byte_offset(i as isize * 4)) {
+                match native_to_lua(&lua, arg_type, *arg_pointer.byte_offset(i as isize * 4)) {
                     Ok(value) => callback_args.push(value),
                     Err(e) => {
                         warn!(
@@ -177,7 +177,7 @@ pub fn hook_function<'lua>(
 
             // Call the lua hook
             let return_value =
-                match callback.call::<_, mlua::Value>(mlua::MultiValue::from_vec(callback_args)) {
+                match callback.call::<mlua::Value>(mlua::MultiValue::from_iter(callback_args)) {
                     Ok(value) => value,
                     Err(e) => {
                         warn!("Lua hook threw error: {:?}. Panicking...", e);
@@ -243,12 +243,12 @@ impl NativeFunction {
         }
     }
 
-    pub fn call<'lua>(
+    pub fn call(
         &self,
-        lua: &'lua Lua,
+        lua: &Lua,
         args: mlua::MultiValue,
-    ) -> Result<mlua::Value<'lua>, mlua::Error> {
-        let args = args.into_vec();
+    ) -> Result<mlua::Value, mlua::Error> {
+        let args = args.iter().collect::<Vec<&mlua::Value>>();
 
         debug!(
             "Calling function at address {:x} with ({:?}), expecting return type {:?}",
@@ -312,7 +312,7 @@ impl NativeFunction {
 }
 
 impl UserData for NativeFunction {
-    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("getAddress", |_, native_function, ()| {
             return Ok(native_function.address);
         });
@@ -324,8 +324,8 @@ impl UserData for NativeFunction {
     }
 }
 
-pub fn create_native_function_function<'lua>(
-    lua: &'lua Lua,
+pub fn create_native_function_function(
+    lua: &Lua,
     (arg_types, return_type, lua_fn): (Vec<String>, String, mlua::Function),
 ) -> Result<NativeFunction, mlua::Error> {
     debug!(
@@ -385,7 +385,7 @@ pub fn create_native_function_function<'lua>(
             }
         }
 
-        let return_value = match lua_fn.call::<_, mlua::Value>(mlua::MultiValue::from_vec(lua_args))
+        let return_value = match lua_fn.call::<mlua::Value>(mlua::MultiValue::from_iter(lua_args))
         {
             Ok(value) => value,
             Err(e) => {
@@ -536,8 +536,8 @@ pub fn create_native_function_function<'lua>(
     }
 }
 
-pub fn get_native_function<'lua>(
-    _: &'lua Lua,
+pub fn get_native_function(
+    _: &Lua,
     (address, arg_types, return_type): (u32, Vec<String>, String),
 ) -> Result<NativeFunction, mlua::Error> {
     let mut lua_arg_types: Vec<Type> = Vec::new();

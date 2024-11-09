@@ -1,7 +1,7 @@
 use std::{cell::Ref, collections::HashMap};
 
 use log::debug;
-use mlua::{AnyUserData, AnyUserDataExt, Lua, MetaMethod, UserData};
+use mlua::{AnyUserData, ObjectLike, Lua, MetaMethod, UserData, UserDataRef};
 
 use futuremod_hook::types::{lua_to_native, native_to_lua, Type};
 
@@ -26,13 +26,13 @@ pub struct NativeStruct {
 }
 
 impl UserData for NativeStruct {
-    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_function(
             MetaMethod::Index,
             |lua,
              (native_struct_userdata, field): (AnyUserData, String)|
-             -> Result<mlua::Value<'lua>, mlua::Error> {
-                let native_struct: Ref<NativeStruct> =
+             -> Result<mlua::Value, mlua::Error> {
+                let native_struct: UserDataRef<NativeStruct> =
                     native_struct_userdata.borrow().map_err(|_| {
                         mlua::Error::RuntimeError(
                             "Self must be a native struct definition".to_string(),
@@ -73,7 +73,7 @@ impl UserData for NativeStruct {
 
                         // Call the `getByteSize` method of the value to get the expected amount of byte the type allocates
                         let byte_size = complex_type
-                            .call_method::<_, u32>("getByteSize", ())
+                            .call_method::<u32>("getByteSize", ())
                             .map_err(|e| {
                                 mlua::Error::RuntimeError(format!(
                                     "getByteSize method errored: {}",
@@ -95,13 +95,13 @@ impl UserData for NativeStruct {
                         // Call the type's 'fromBytes' function to construct an instance of the type from the bytes
                         let f =
                             complex_type
-                                .get::<_, mlua::Function>("fromBytes")
+                                .get::<mlua::Function>("fromBytes")
                                 .map_err(|_| {
                                     mlua::Error::RuntimeError(
                                         "Type userdata is missing 'fromBytes' function".to_string(),
                                     )
                                 })?;
-                        let value = f.call::<_, mlua::Value>((complex_type, byte_vec))?;
+                        let value = f.call::<mlua::Value>((complex_type, byte_vec))?;
 
                         Ok(value)
                     }
@@ -114,7 +114,7 @@ impl UserData for NativeStruct {
             |_,
              (native_struct_userdata, field, value): (AnyUserData, String, mlua::Value)|
              -> Result<(), mlua::Error> {
-                let native_struct: Ref<NativeStruct> = native_struct_userdata.borrow()?;
+                let native_struct: UserDataRef<NativeStruct> = native_struct_userdata.borrow()?;
 
                 debug!(
                     "Set field {} of struct at 0x{:x} to {:?}",
@@ -213,7 +213,7 @@ impl UserData for NativeStruct {
                             })?;
 
                         let bytes = complex_type
-                            .call_method::<mlua::Value, Vec<u8>>("toBytes", value)
+                            .call_method::<Vec<u8>>("toBytes", value)
                             .map_err(|e| {
                                 mlua::Error::RuntimeError(format!(
                                     "toBytes function of complex type errored: {}",
@@ -258,12 +258,12 @@ pub struct NativeStructDefinition {
     fields: HashMap<String, FieldDefinition>,
 }
 
-fn native_struct_from_definition<'a>(
-    lua: &'a Lua,
+fn native_struct_from_definition(
+    lua: &Lua,
     address: u32,
-    definition_userdata: AnyUserData<'a>,
-) -> LuaResult<AnyUserData<'a>> {
-    let definition: Ref<NativeStructDefinition> = definition_userdata.borrow()?;
+    definition_userdata: AnyUserData,
+) -> LuaResult<AnyUserData> {
+    let definition: UserDataRef<NativeStructDefinition> = definition_userdata.borrow()?;
 
     let fields = &definition.fields;
     let mut struct_fields: HashMap<String, NativeStructField> = HashMap::new();
@@ -301,22 +301,22 @@ fn native_struct_from_definition<'a>(
 }
 
 impl UserData for NativeStructDefinition {
-    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_function(
             "cast",
             |lua,
              (definition, address): (AnyUserData, u32)|
-             -> Result<AnyUserData<'lua>, mlua::Error> {
+             -> Result<AnyUserData, mlua::Error> {
                 native_struct_from_definition(lua, address, definition)
             },
         );
     }
 }
 
-pub fn create_native_struct_definition_fn<'lua>(
-    lua: &'lua Lua,
-    fields: mlua::Table<'lua>,
-) -> Result<AnyUserData<'lua>, mlua::Error> {
+pub fn create_native_struct_definition_fn(
+    lua: &Lua,
+    fields: mlua::Table,
+) -> Result<AnyUserData, mlua::Error> {
     debug!("Creating native struct def");
     let mut native_fields: HashMap<String, FieldDefinition> = HashMap::new();
 
@@ -340,7 +340,7 @@ pub fn create_native_struct_definition_fn<'lua>(
         })?;
         let native_type: FieldDefinitionType = match native_type_id.type_name() {
             "string" => match native_type_id.as_str() {
-                Some(native_type_str) => match Type::try_from_str(native_type_str) {
+                Some(native_type_str) => match Type::try_from_str(&native_type_str) {
                     Some(value) => FieldDefinitionType::Primitive(value),
                     None => return Err(mlua::Error::runtime("Unsupported type")),
                 },
@@ -348,11 +348,11 @@ pub fn create_native_struct_definition_fn<'lua>(
             },
             "userdata" => match native_type_id.as_userdata() {
                 Some(userdata) => {
-                    userdata.get::<_, mlua::Function>("toBytes").map_err(|_| {
+                    userdata.get::<mlua::Function>("toBytes").map_err(|_| {
                         mlua::Error::runtime("Complex type is missing function 'toBytes'")
                     })?;
                     userdata
-                        .get::<_, mlua::Function>("fromBytes")
+                        .get::<mlua::Function>("fromBytes")
                         .map_err(|_| {
                             mlua::Error::runtime("Complex type is missing function 'fromBytes'")
                         })?;
@@ -389,7 +389,7 @@ pub fn create_native_struct_definition_fn<'lua>(
             Err(_) => return Err(mlua::Error::runtime("Field definition must be table")),
         };
 
-        let field_definition_type = field_definition.get::<_, mlua::Value>("type")?;
+        let field_definition_type = field_definition.get::<mlua::Value>("type")?;
         let field_definition_type_type_name = field_definition_type.type_name();
 
         if field_definition_type_type_name == "userdata" {
@@ -401,10 +401,10 @@ pub fn create_native_struct_definition_fn<'lua>(
     Ok(definition_userdata)
 }
 
-pub fn create_native_struct_fn<'lua>(
-    lua: &'lua Lua,
-    (address, definition_userdata): (u32, AnyUserData<'lua>),
-) -> Result<AnyUserData<'lua>, mlua::Error> {
+pub fn create_native_struct_fn(
+    lua: &Lua,
+    (address, definition_userdata): (u32, AnyUserData),
+) -> Result<AnyUserData, mlua::Error> {
     debug!("Create new native struct at 0x{:x}", address);
 
     native_struct_from_definition(lua, address, definition_userdata)
