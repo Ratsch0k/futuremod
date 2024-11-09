@@ -1,4 +1,7 @@
-use super::{library::settings::{get_settings, PluginSettings}, plugin_environment::PluginEnvironment};
+use super::{
+    library::settings::{get_settings, PluginSettings},
+    plugin_environment::PluginEnvironment,
+};
 use futuremod_data::plugin::{PluginError, PluginInfo};
 use log::*;
 use mlua::{Function, Lua, Table};
@@ -382,11 +385,11 @@ impl Plugin {
                 debug!("{:#?}", context.environment.libraries);
                 get_settings(&context.environment.libraries)
                     .map_err(|e| PluginError::Error(format!("{}", e)))
-            },
+            }
             _ => {
                 debug!("Requested plugin settings of not loaded plugin");
                 Ok(None)
-            },
+            }
         }
     }
 }

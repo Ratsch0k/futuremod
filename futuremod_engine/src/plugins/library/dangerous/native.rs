@@ -1,7 +1,7 @@
 use std::{cell::Ref, collections::HashMap};
 
 use log::debug;
-use mlua::{AnyUserData, ObjectLike, Lua, MetaMethod, UserData, UserDataRef};
+use mlua::{AnyUserData, Lua, MetaMethod, ObjectLike, UserData, UserDataRef};
 
 use futuremod_hook::types::{lua_to_native, native_to_lua, Type};
 
@@ -93,14 +93,13 @@ impl UserData for NativeStruct {
                         }
 
                         // Call the type's 'fromBytes' function to construct an instance of the type from the bytes
-                        let f =
-                            complex_type
-                                .get::<mlua::Function>("fromBytes")
-                                .map_err(|_| {
-                                    mlua::Error::RuntimeError(
-                                        "Type userdata is missing 'fromBytes' function".to_string(),
-                                    )
-                                })?;
+                        let f = complex_type
+                            .get::<mlua::Function>("fromBytes")
+                            .map_err(|_| {
+                                mlua::Error::RuntimeError(
+                                    "Type userdata is missing 'fromBytes' function".to_string(),
+                                )
+                            })?;
                         let value = f.call::<mlua::Value>((complex_type, byte_vec))?;
 
                         Ok(value)
@@ -304,9 +303,7 @@ impl UserData for NativeStructDefinition {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_function(
             "cast",
-            |lua,
-             (definition, address): (AnyUserData, u32)|
-             -> Result<AnyUserData, mlua::Error> {
+            |lua, (definition, address): (AnyUserData, u32)| -> Result<AnyUserData, mlua::Error> {
                 native_struct_from_definition(lua, address, definition)
             },
         );
@@ -351,11 +348,9 @@ pub fn create_native_struct_definition_fn(
                     userdata.get::<mlua::Function>("toBytes").map_err(|_| {
                         mlua::Error::runtime("Complex type is missing function 'toBytes'")
                     })?;
-                    userdata
-                        .get::<mlua::Function>("fromBytes")
-                        .map_err(|_| {
-                            mlua::Error::runtime("Complex type is missing function 'fromBytes'")
-                        })?;
+                    userdata.get::<mlua::Function>("fromBytes").map_err(|_| {
+                        mlua::Error::runtime("Complex type is missing function 'fromBytes'")
+                    })?;
 
                     FieldDefinitionType::Complex(key.clone())
                 }

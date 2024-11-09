@@ -1,9 +1,12 @@
-use std::{collections::{HashMap, HashSet}, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
+use anyhow::anyhow;
 use log::{debug, info};
 use mlua::{AnyUserData, Lua, Table, UserData};
 use serde::{Deserialize, Serialize};
-use anyhow::anyhow;
 
 use super::LuaResult;
 
@@ -14,7 +17,7 @@ pub struct PluginSettingsLibrary {
 
 impl PluginSettingsLibrary {
     pub fn new() -> Self {
-        PluginSettingsLibrary{settings: None}
+        PluginSettingsLibrary { settings: None }
     }
 }
 
@@ -25,27 +28,31 @@ impl UserData for PluginSettingsLibrary {
 
             for pair in components.pairs::<mlua::Value, mlua::Value>() {
                 let (_key, value) = pair?;
-                let component = value.as_userdata().ok_or(mlua::Error::RuntimeError("invalid component".into()))?;
-        
+                let component = value
+                    .as_userdata()
+                    .ok_or(mlua::Error::RuntimeError("invalid component".into()))?;
+
                 if component.is::<ButtonComponent>() {
                     debug!("Got button builder component");
-        
+
                     let builder = component.borrow::<ButtonComponent>()?;
                     setting_components.push(SettingsComponent::Button(builder.clone()));
                 } else if component.is::<TextComponent>() {
                     debug!("Got text compoment");
-        
+
                     let builder = component.borrow::<TextComponent>()?;
                     setting_components.push(SettingsComponent::Text(builder.clone()));
                 } else {
                     debug!("Got unknown compomnent: {:?}", value);
                 }
             }
-        
-            let settings = PluginSettings{components: setting_components};
-        
+
+            let settings = PluginSettings {
+                components: setting_components,
+            };
+
             settings_library.settings = Some(settings);
-        
+
             Ok(())
         });
 
@@ -98,7 +105,9 @@ fn create_settings(lua: &Lua, components: Table) -> LuaResult<()> {
 
     for pair in components.pairs::<mlua::Value, mlua::Value>() {
         let (_key, value) = pair?;
-        let component = value.as_userdata().ok_or(mlua::Error::RuntimeError("invalid component".into()))?;
+        let component = value
+            .as_userdata()
+            .ok_or(mlua::Error::RuntimeError("invalid component".into()))?;
 
         if component.is::<ButtonComponent>() {
             debug!("Got button builder component");
@@ -120,7 +129,9 @@ fn create_settings(lua: &Lua, components: Table) -> LuaResult<()> {
         }
     }
 
-    let settings = PluginSettings{components: setting_components};
+    let settings = PluginSettings {
+        components: setting_components,
+    };
 
     debug!("Created setting: {:#?}", settings);
 
@@ -129,7 +140,10 @@ fn create_settings(lua: &Lua, components: Table) -> LuaResult<()> {
     debug!("Stored settings in plugin globals");
 
     let other_globals = lua.globals();
-    debug!("Stored settings: {:#?}", other_globals.get::<mlua::Value>("_settings"));
+    debug!(
+        "Stored settings: {:#?}",
+        other_globals.get::<mlua::Value>("_settings")
+    );
 
     lua.globals().for_each(|key: String, value: mlua::Value| {
         debug!("Setting Global: {key} -> {value:#?}");
@@ -139,7 +153,9 @@ fn create_settings(lua: &Lua, components: Table) -> LuaResult<()> {
     Ok(())
 }
 
-pub fn get_settings(context: &HashMap<&'static str, mlua::Value>) -> Result<Option<PluginSettings>, anyhow::Error> {
+pub fn get_settings(
+    context: &HashMap<&'static str, mlua::Value>,
+) -> Result<Option<PluginSettings>, anyhow::Error> {
     let has_settings = context.contains_key("settings");
 
     if !has_settings {
@@ -149,15 +165,18 @@ pub fn get_settings(context: &HashMap<&'static str, mlua::Value>) -> Result<Opti
 
     debug!("Settings key found in plugin's globals");
 
-    let settings_global_value: &mlua::Value = context.get("settings")
-        .ok_or(anyhow!("Could not access settings global in plugin context"))?;
+    let settings_global_value: &mlua::Value = context.get("settings").ok_or(anyhow!(
+        "Could not access settings global in plugin context"
+    ))?;
 
-    let settings_global = settings_global_value.as_userdata()
+    let settings_global = settings_global_value
+        .as_userdata()
         .ok_or(anyhow!("Global settings has invalid format"))?;
 
     debug!("Got settings as userdata from globals");
 
-    let settings = settings_global.borrow::<PluginSettingsLibrary>()
+    let settings = settings_global
+        .borrow::<PluginSettingsLibrary>()
         .map_err(|e| anyhow!("Plugin context does not contain valid setting: {e}"))?;
 
     debug!("Could convert settings userdata to settings struct");
@@ -181,7 +200,7 @@ fn create_button(_: &Lua, text: String) -> LuaResult<ButtonComponent> {
 impl ButtonComponent {
     pub fn new(text: String) -> ButtonComponent {
         debug!("Create button with text '{}'", text);
-        
+
         ButtonComponent {
             text,
             disabled: false,
@@ -201,13 +220,16 @@ impl UserData for ButtonComponent {
             Ok(new_buider)
         });
 
-        methods.add_function("withDisabled", |_, (builder, value): (AnyUserData, bool)| {
-            debug!("Change button disabled to '{}'", value);
-            let builder = builder.borrow::<ButtonComponent>()?;
-            let mut new_buider = builder.clone();
-            new_buider.disabled = value;
-            Ok(new_buider)
-        });
+        methods.add_function(
+            "withDisabled",
+            |_, (builder, value): (AnyUserData, bool)| {
+                debug!("Change button disabled to '{}'", value);
+                let builder = builder.borrow::<ButtonComponent>()?;
+                let mut new_buider = builder.clone();
+                new_buider.disabled = value;
+                Ok(new_buider)
+            },
+        );
 
         methods.add_function("withID", |_, (builder, id): (AnyUserData, String)| {
             debug!("Change button ID to {}", id);
@@ -217,33 +239,35 @@ impl UserData for ButtonComponent {
             Ok(new_buider)
         });
 
-        methods.add_function("onClick", |_, (builder, cb): (AnyUserData, mlua::Function)| {
-            debug!("Change button on click listener to '{:?}'", cb);
-            let builder = builder.borrow::<ButtonComponent>()?;
-            let mut new_buider = builder.clone();
-            new_buider.on_click = Some(cb);
-            Ok(new_buider)
-        });
+        methods.add_function(
+            "onClick",
+            |_, (builder, cb): (AnyUserData, mlua::Function)| {
+                debug!("Change button on click listener to '{:?}'", cb);
+                let builder = builder.borrow::<ButtonComponent>()?;
+                let mut new_buider = builder.clone();
+                new_buider.on_click = Some(cb);
+                Ok(new_buider)
+            },
+        );
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SectionComponent {
-    content: Vec<SettingsComponent>
+    content: Vec<SettingsComponent>,
 }
 
 impl SectionComponent {
     pub fn new(content: Vec<SettingsComponent>) -> SectionComponent {
-        SectionComponent{content}
+        SectionComponent { content }
     }
 }
 
 impl UserData for SectionComponent {}
 
-
 #[derive(Debug, Clone, Serialize)]
 pub struct TextComponent {
-    pub text: String
+    pub text: String,
 }
 
 fn create_text(_lua: &Lua, text: String) -> LuaResult<TextComponent> {
@@ -252,17 +276,20 @@ fn create_text(_lua: &Lua, text: String) -> LuaResult<TextComponent> {
 
 impl TextComponent {
     pub fn new(text: String) -> TextComponent {
-        TextComponent{text}
+        TextComponent { text }
     }
 }
 
 impl UserData for TextComponent {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_function("withText", |_, (text_component, text): (AnyUserData, String)| {
-            let original = text_component.borrow::<TextComponent>()?;
-            let mut new_component = original.clone();
-            new_component.text = text;
-            Ok(new_component)
-        });
+        methods.add_function(
+            "withText",
+            |_, (text_component, text): (AnyUserData, String)| {
+                let original = text_component.borrow::<TextComponent>()?;
+                let mut new_component = original.clone();
+                new_component.text = text;
+                Ok(new_component)
+            },
+        );
     }
 }

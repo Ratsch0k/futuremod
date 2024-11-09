@@ -247,7 +247,10 @@ where
 {
     match GlobalPluginManager::get().lock() {
         Ok(plugin_manager) => Ok(f(&plugin_manager)),
-        Err(e) => Err(AppError(anyhow!("Could not get lock to plugin manager: {:?}", e))),
+        Err(e) => Err(AppError(anyhow!(
+            "Could not get lock to plugin manager: {:?}",
+            e
+        ))),
     }
 }
 
@@ -339,17 +342,20 @@ async fn get_plugin_settings(Json(payload): Json<PluginByName>) -> impl IntoResp
                 None => {
                     debug!("Plugin has not settings");
                     StatusCode::NO_CONTENT.into_response()
-                },
+                }
                 Some(settings) => {
                     debug!("Plugin has settings, returning");
                     Json(settings).into_response()
-                },
+                }
             },
             Err(e) => match e {
-                PluginManagerError::PluginNotFound => 
-                    StatusCode::NOT_FOUND.into_response(),
-                e => (StatusCode::INTERNAL_SERVER_ERROR, AppError(anyhow!("{:?}", e))).into_response(),
-            }
+                PluginManagerError::PluginNotFound => StatusCode::NOT_FOUND.into_response(),
+                e => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError(anyhow!("{:?}", e)),
+                )
+                    .into_response(),
+            },
         }
     })
 }

@@ -422,12 +422,15 @@ impl PluginManager {
         return &self.plugins;
     }
 
-    pub fn get_plugin_settings(&self, name: &str) -> Result<Option<PluginSettings>, PluginManagerError> {
+    pub fn get_plugin_settings(
+        &self,
+        name: &str,
+    ) -> Result<Option<PluginSettings>, PluginManagerError> {
         info!("Getting settings of plugin '{}'", name);
         match self.plugins.get(name) {
-            Some(game_plugin) => {
-                game_plugin.get_settings().map_err(PluginManagerError::Plugin)
-            }
+            Some(game_plugin) => game_plugin
+                .get_settings()
+                .map_err(PluginManagerError::Plugin),
             None => {
                 warn!("Plugin doesn't exist");
                 Err(PluginManagerError::PluginNotFound)

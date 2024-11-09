@@ -8,7 +8,9 @@ use std::{
 };
 
 use log::info;
-use mlua::{AnyUserData, FromLua, IntoLua, Lua, MetaMethod, Table, UserData, UserDataMethods, UserDataRef};
+use mlua::{
+    AnyUserData, FromLua, IntoLua, Lua, MetaMethod, Table, UserData, UserDataMethods, UserDataRef,
+};
 use nalgebra::{DMatrix, Matrix4, Scalar, Vector3};
 use num::{
     traits::{FromBytes, ToBytes},
@@ -244,10 +246,7 @@ fn create_zero_matrix<T: Scalar + Zero>(
 }
 
 /// Create identify matrix
-fn create_identity_matrix<T: Scalar + Zero + One>(
-    _: &Lua,
-    size: u8,
-) -> LuaResult<LuaMatrix<T>> {
+fn create_identity_matrix<T: Scalar + Zero + One>(_: &Lua, size: u8) -> LuaResult<LuaMatrix<T>> {
     let size = size as usize;
 
     Ok(LuaMatrix(Arc::new(Mutex::new(DMatrix::<T>::identity(

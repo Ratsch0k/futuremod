@@ -243,11 +243,7 @@ impl NativeFunction {
         }
     }
 
-    pub fn call(
-        &self,
-        lua: &Lua,
-        args: mlua::MultiValue,
-    ) -> Result<mlua::Value, mlua::Error> {
+    pub fn call(&self, lua: &Lua, args: mlua::MultiValue) -> Result<mlua::Value, mlua::Error> {
         let args = args.iter().collect::<Vec<&mlua::Value>>();
 
         debug!(
@@ -385,8 +381,7 @@ pub fn create_native_function_function(
             }
         }
 
-        let return_value = match lua_fn.call::<mlua::Value>(mlua::MultiValue::from_iter(lua_args))
-        {
+        let return_value = match lua_fn.call::<mlua::Value>(mlua::MultiValue::from_iter(lua_args)) {
             Ok(value) => value,
             Err(e) => {
                 warn!("Lua function threw unexpected error: {:?}. Panicking...", e);

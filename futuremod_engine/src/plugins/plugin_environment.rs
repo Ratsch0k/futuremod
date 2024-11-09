@@ -7,7 +7,13 @@ use std::{
 };
 
 use super::library::{
-    dangerous::create_dangerous_library, game::create_game_library, input::create_input_library, matrix::create_matrix_library, settings::{create_settings_library, create_settings_library_new}, system::create_system_library, ui::create_ui_library
+    dangerous::create_dangerous_library,
+    game::create_game_library,
+    input::create_input_library,
+    matrix::create_matrix_library,
+    settings::{create_settings_library, create_settings_library_new},
+    system::create_system_library,
+    ui::create_ui_library,
 };
 use anyhow::bail;
 use futuremod_data::plugin::{PluginDependency, PluginInfo};
@@ -123,21 +129,33 @@ fn prepare_libraries(
 
     for library in info.dependencies.iter() {
         match library {
-            PluginDependency::Dangerous => {
-                libraries.insert("dangerous", mlua::Value::Table(create_dangerous_library(lua.clone())?))
+            PluginDependency::Dangerous => libraries.insert(
+                "dangerous",
+                mlua::Value::Table(create_dangerous_library(lua.clone())?),
+            ),
+            PluginDependency::Game => libraries.insert(
+                "game",
+                mlua::Value::Table(create_game_library(lua.clone())?),
+            ),
+            PluginDependency::Input => libraries.insert(
+                "input",
+                mlua::Value::Table(create_input_library(lua.clone())?),
+            ),
+            PluginDependency::UI => {
+                libraries.insert("ui", mlua::Value::Table(create_ui_library(lua.clone())?))
             }
-            PluginDependency::Game => libraries.insert("game", mlua::Value::Table(create_game_library(lua.clone())?)),
-            PluginDependency::Input => {
-                libraries.insert("input", mlua::Value::Table(create_input_library(lua.clone())?))
-            }
-            PluginDependency::UI => libraries.insert("ui", mlua::Value::Table(create_ui_library(lua.clone())?)),
-            PluginDependency::System => {
-                libraries.insert("system", mlua::Value::Table(create_system_library(lua.clone())?))
-            }
-            PluginDependency::Matrix => {
-                libraries.insert("matrix", mlua::Value::Table(create_matrix_library(lua.clone())?))
-            }
-            PluginDependency::Settings => libraries.insert("settings", create_settings_library_new(lua.clone())?.into_lua(&lua)?),
+            PluginDependency::System => libraries.insert(
+                "system",
+                mlua::Value::Table(create_system_library(lua.clone())?),
+            ),
+            PluginDependency::Matrix => libraries.insert(
+                "matrix",
+                mlua::Value::Table(create_matrix_library(lua.clone())?),
+            ),
+            PluginDependency::Settings => libraries.insert(
+                "settings",
+                create_settings_library_new(lua.clone())?.into_lua(&lua)?,
+            ),
             PluginDependency::Math => libraries.insert("math", globals.get("math").to_owned()?),
             PluginDependency::Bit32 => libraries.insert("bit32", globals.get("bit32").to_owned()?),
             PluginDependency::String => {
@@ -145,7 +163,6 @@ fn prepare_libraries(
             }
             PluginDependency::Table => libraries.insert("table", globals.get("table").to_owned()?),
             PluginDependency::Utf8 => libraries.insert("utf8", globals.get("utf8").to_owned()?),
-            
         };
     }
 
