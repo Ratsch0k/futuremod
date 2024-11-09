@@ -76,6 +76,7 @@ fn serve(config: Config) -> Result<(), Error> {
                 .route("/plugin/install-dev", post(install_plugin_in_dev_mode))
                 .route("/plugin/uninstall", post(uninstall_plugin))
                 .route("/plugin/info", put(get_plugin_info))
+                .route("/plugin/settings", put(get_plugin_settings))
                 .route("/log", get(log_handler));
 
             axum::Server::bind(
@@ -240,13 +241,13 @@ where
     }
 }
 
-fn with_plugin_manager<F, R>(f: F) -> Result<R, anyhow::Error>
+fn with_plugin_manager<F, R>(f: F) -> Result<R, AppError>
 where
-    F: Fn(&PluginManager) -> Result<R, anyhow::Error>,
+    F: Fn(&PluginManager) -> R,
 {
     match GlobalPluginManager::get().lock() {
-        Ok(mut plugin_manager) => Ok(f(&mut plugin_manager)?),
-        Err(e) => Err(anyhow!("Could not get lock to plugin manager: {:?}", e)),
+        Ok(plugin_manager) => Ok(f(&plugin_manager)),
+        Err(e) => Err(AppError(anyhow!("Could not get lock to plugin manager: {:?}", e))),
     }
 }
 
@@ -326,6 +327,29 @@ async fn reload_plugin(Json(payload): Json<PluginByName>) -> impl IntoResponse {
                     .into_response(),
             },
             _ => StatusCode::NO_CONTENT.into_response(),
+        }
+    })
+}
+
+async fn get_plugin_settings(Json(payload): Json<PluginByName>) -> impl IntoResponse {
+    debug!("Getting settings of '{}'", payload.name);
+    with_plugin_manager(|plugin_manager| -> Response {
+        match plugin_manager.get_plugin_settings(&payload.name) {
+            Ok(optional_result) => match optional_result {
+                None => {
+                    debug!("Plugin has not settings");
+                    StatusCode::NO_CONTENT.into_response()
+                },
+                Some(settings) => {
+                    debug!("Plugin has settings, returning");
+                    Json(settings).into_response()
+                },
+            },
+            Err(e) => match e {
+                PluginManagerError::PluginNotFound => 
+                    StatusCode::NOT_FOUND.into_response(),
+                e => (StatusCode::INTERNAL_SERVER_ERROR, AppError(anyhow!("{:?}", e))).into_response(),
+            }
         }
     })
 }

@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::{collections::HashMap, fs};
 use walkdir::WalkDir;
 
+use super::library::settings::PluginSettings;
 use super::plugin::*;
 use super::plugin_info::PluginInfoError;
 use super::plugin_persistence::{PersistedPlugin, PersistedPlugins, PersistentPluginState};
@@ -419,6 +420,19 @@ impl PluginManager {
 
     pub fn get_plugins(&self) -> &HashMap<String, Plugin> {
         return &self.plugins;
+    }
+
+    pub fn get_plugin_settings(&self, name: &str) -> Result<Option<PluginSettings>, PluginManagerError> {
+        info!("Getting settings of plugin '{}'", name);
+        match self.plugins.get(name) {
+            Some(game_plugin) => {
+                game_plugin.get_settings().map_err(PluginManagerError::Plugin)
+            }
+            None => {
+                warn!("Plugin doesn't exist");
+                Err(PluginManagerError::PluginNotFound)
+            }
+        }
     }
 
     /// Install a plugin from a folder.

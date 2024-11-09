@@ -376,6 +376,20 @@ impl Plugin {
         self.enabled
     }
 
+    pub fn get_settings(&self) -> Result<Option<PluginSettings>, PluginError> {
+        match &self.state {
+            PluginState::Loaded(context) => {
+                debug!("{:#?}", context.environment.libraries);
+                get_settings(&context.environment.libraries)
+                    .map_err(|e| PluginError::Error(format!("{}", e)))
+            },
+            _ => {
+                debug!("Requested plugin settings of not loaded plugin");
+                Ok(None)
+            },
+        }
+    }
+}
 
 fn get_lua_function_or_none(module: &Table, name: &str) -> Option<mlua::Function> {
     match module.get::<Function>(name) {

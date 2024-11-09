@@ -1,0 +1,10 @@
+name = "Settings Test"
+version = "0.0.1"
+authors = ["Simon Kurz"]
+dependencies = ["settings", "system"]
+description = """\
+# Settings Test
+This plugin tests the settings function.
+
+It does nothing more than registering some settings and logging changes to them.
+"""
