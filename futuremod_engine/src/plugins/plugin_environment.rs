@@ -7,13 +7,9 @@ use std::{
 };
 
 use super::library::{
-    dangerous::create_dangerous_library,
-    game::create_game_library,
-    input::create_input_library,
-    matrix::create_matrix_library,
-    settings::create_settings_library_new,
-    system::create_system_library,
-    ui::create_ui_library,
+    dangerous::create_dangerous_library, game::create_game_library, input::create_input_library,
+    matrix::create_matrix_library, settings::create_settings_library_new,
+    system::create_system_library, ui::create_ui_library,
 };
 use anyhow::bail;
 use futuremod_data::plugin::{PluginDependency, PluginInfo};
