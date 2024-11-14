@@ -1,6 +1,6 @@
-use futuremod_data::plugin::{Plugin, PluginDependency, PluginState};
+use futuremod_data::plugin::{settings::{self, Component, PluginSettings}, Plugin, PluginDependency, PluginState};
 use iced::{
-    widget::{column, container, markdown, row, text, Scrollable, Toggler},
+    widget::{column, container, markdown, row, scrollable, text, Scrollable, Toggler},
     Alignment, Length, Padding,
 };
 use iced_fonts::Bootstrap;
@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-use super::Message;
+use super::{view::FutureResult, Message};
 
 fn plugin_reload_button<'a>(plugin: &Plugin) -> Element<'a, Message> {
     icon_text_button(Bootstrap::ArrowClockwise, "Reload")
@@ -111,6 +111,7 @@ pub fn plugin_details_view<'a>(
         ])
         .padding(8),
         plugin_details_content(&plugin_view.description, plugin),
+        plugin_info_box(loading_settings(&plugin_view.settings)),
     ]
     .into()
 }
@@ -206,4 +207,52 @@ fn plugin_toggle_button<'a>(plugin: &Plugin) -> Option<Element<'a, Message>> {
         )
         .into(),
     )
+}
+
+fn loading_settings<'a>(loading_settings: &'a FutureResult<PluginSettings, String>) -> Element<'a, Message> {
+    match loading_settings {
+        FutureResult::Loading => text("Loading...").into(),
+        FutureResult::Finished(plugin_settings) => settings(plugin_settings),
+        FutureResult::Error(e) => text(format!("Could not load plugin settings: {}", e)).into(),
+    }
+}
+
+fn settings<'a>(settings: &'a PluginSettings) -> Element<'a, Message> {
+    scrollable(render_component(&settings.root)).into()
+}
+
+fn render_component<'a>(component: &'a settings::Component) -> Element<'a, Message> {
+    match component {
+        Component::Button(button) => render_button(button),
+        Component::Section(section) => render_section(section),
+        Component::Text(text) => render_text(text),
+    }
+}
+
+fn render_button<'a>(settings_button: &'a settings::Button) -> Element<'a, Message> {
+    button(text(&settings_button.text))
+        .on_press_maybe(if settings_button.disabled {
+            None
+        } else {
+            Some(Message::SettingsEvent(settings_button.id.clone(), settings::Event::ClickButton))
+        })
+        .into()
+}
+
+fn render_section<'a>(settings_section: &'a settings::Section) -> Element<'a, Message> {
+    let mut section = Column::new();
+
+    for component in settings_section.content.iter() {
+        section = section.push(render_component(&component));
+    }
+
+    section
+        .spacing(8)
+        .padding(Padding{top: 16.0, right: 0.0, bottom: 16.0, left: 0.0})
+        .into()
+}
+
+fn render_text<'a>(settings_text: &'a settings::Text) -> Element<'a, Message> {
+    text(&settings_text.text)
+        .into()
 }
