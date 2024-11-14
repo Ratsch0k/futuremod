@@ -1,5 +1,4 @@
 use std::{
-    cell::Ref,
     fmt,
     marker::PhantomData,
     mem::size_of,
@@ -8,7 +7,9 @@ use std::{
 };
 
 use log::info;
-use mlua::{AnyUserData, FromLua, IntoLua, Lua, MetaMethod, OwnedTable, UserData, UserDataMethods};
+use mlua::{
+    AnyUserData, FromLua, IntoLua, Lua, MetaMethod, Table, UserData, UserDataMethods, UserDataRef,
+};
 use nalgebra::{DMatrix, Matrix4, Scalar, Vector3};
 use num::{
     traits::{FromBytes, ToBytes},
@@ -17,7 +18,7 @@ use num::{
 
 use super::LuaResult;
 
-pub fn create_matrix_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
+pub fn create_matrix_library(lua: Arc<Lua>) -> Result<Table, mlua::Error> {
     let table = lua.create_table()?;
 
     // Float-based dynamic matrix
@@ -45,7 +46,7 @@ pub fn create_matrix_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
     table.set("ModelMatrix", lua.create_proxy::<ModelMatrix>()?)?;
     table.set("newModel", lua.create_function(create_model_matrix)?)?;
 
-    Ok(table.into_owned())
+    Ok(table)
 }
 
 /// Trait for types that encapsulate their data in an arc and mutex.
@@ -116,8 +117,8 @@ impl<T> LuaMatrix<T> {
     }
 }
 
-impl<'a, T: 'static> FromLua<'a> for LuaMatrix<T> {
-    fn from_lua(value: mlua::Value<'a>, lua: &'a Lua) -> mlua::Result<Self> {
+impl<T: 'static> FromLua for LuaMatrix<T> {
+    fn from_lua(value: mlua::Value, lua: &Lua) -> mlua::Result<Self> {
         try_from_userdata::<LuaMatrix<T>>(value, lua)
     }
 }
@@ -126,7 +127,7 @@ impl<'a, T: 'static> FromLua<'a> for LuaMatrix<T> {
 /// If value is a userdata of type T, this function returns a clone of the userdata.
 ///
 /// Errors if the given lua value is not a userdata and if the userdata is not of type T.
-fn try_from_userdata<'a, T: 'static>(value: mlua::Value<'a>, _: &'a Lua) -> mlua::Result<T>
+fn try_from_userdata<T: 'static>(value: mlua::Value, _: &Lua) -> mlua::Result<T>
 where
     T: Clone,
 {
@@ -139,7 +140,7 @@ where
         return Err(mlua::Error::RuntimeError("Not a matrix".to_string()));
     }
 
-    let m: Ref<T> = userdata.borrow()?;
+    let m: UserDataRef<T> = userdata.borrow()?;
 
     Ok(m.clone())
 }
@@ -147,8 +148,8 @@ where
 impl<
         T: Num
             + Copy
-            + for<'a> IntoLua<'a>
-            + for<'a> FromLua<'a>
+            + for<'a> IntoLua
+            + for<'a> FromLua
             + fmt::Debug
             + AddAssign
             + 'static
@@ -156,7 +157,7 @@ impl<
             + MulAssign,
     > UserData for LuaMatrix<T>
 {
-    fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("ncols", |_, matrix| {
             matrix.with_matrix(|matrix| Ok(matrix.ncols()))
         });
@@ -166,10 +167,10 @@ impl<
         });
     }
 
-    fn add_methods<'lua, M>(methods: &mut M)
+    fn add_methods<M>(methods: &mut M)
     where
         M: Sized,
-        M: UserDataMethods<'lua, LuaMatrix<T>>,
+        M: UserDataMethods<LuaMatrix<T>>,
     {
         methods.add_method("at", |_, matrix, (row, col): (u8, u8)| -> LuaResult<T> {
             matrix.check_bounds(row, col)?;
@@ -232,8 +233,8 @@ impl<
 }
 
 /// Create zero matrix
-fn create_zero_matrix<'lua, T: Scalar + Zero>(
-    _: &'lua Lua,
+fn create_zero_matrix<T: Scalar + Zero>(
+    _: &Lua,
     (rows, columns): (u8, u8),
 ) -> LuaResult<LuaMatrix<T>> {
     Ok(LuaMatrix(Arc::new(Mutex::new(DMatrix::<T>::zeros(
@@ -243,10 +244,7 @@ fn create_zero_matrix<'lua, T: Scalar + Zero>(
 }
 
 /// Create identify matrix
-fn create_identity_matrix<'lua, T: Scalar + Zero + One>(
-    _: &'lua Lua,
-    size: u8,
-) -> LuaResult<LuaMatrix<T>> {
+fn create_identity_matrix<T: Scalar + Zero + One>(_: &Lua, size: u8) -> LuaResult<LuaMatrix<T>> {
     let size = size as usize;
 
     Ok(LuaMatrix(Arc::new(Mutex::new(DMatrix::<T>::identity(
@@ -269,7 +267,7 @@ fn create_identity_matrix<'lua, T: Scalar + Zero + One>(
 /// ```
 ///
 /// All rows must have the same length, otherwise, this function panics.
-fn create_matrix<'lua, T: Scalar>(_: &'lua Lua, data: Vec<Vec<T>>) -> LuaResult<LuaMatrix<T>> {
+fn create_matrix<T: Scalar>(_: &Lua, data: Vec<Vec<T>>) -> LuaResult<LuaMatrix<T>> {
     let rows = data.len();
     let cols = data.iter().map(|r| r.len()).fold(0, |l, r| l.max(r));
     let data: Vec<T> = data.into_iter().flatten().collect();
@@ -309,11 +307,11 @@ impl<
             + AddAssign
             + MulAssign
             + fmt::Debug
-            + for<'a> IntoLua<'a>
-            + for<'a> FromLua<'a>,
+            + for<'a> IntoLua
+            + for<'a> FromLua,
     > UserData for MatrixType<T>
 {
-    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_function("new", |_, (nrows, ncols): (u32, u32)| {
             Ok(MatrixType::<T>::new(nrows, ncols))
         });
@@ -465,14 +463,14 @@ impl ModelMatrix {
     }
 }
 
-impl<'a> FromLua<'a> for ModelMatrix {
-    fn from_lua(value: mlua::Value<'a>, lua: &'a Lua) -> mlua::Result<Self> {
+impl FromLua for ModelMatrix {
+    fn from_lua(value: mlua::Value, lua: &Lua) -> mlua::Result<Self> {
         try_from_userdata::<ModelMatrix>(value, lua)
     }
 }
 
 impl UserData for ModelMatrix {
-    fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("ncols", |_, matrix| {
             matrix.with_matrix(|matrix| Ok(matrix.ncols()))
         });
@@ -482,7 +480,7 @@ impl UserData for ModelMatrix {
         });
     }
 
-    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("at", |_, matrix, (row, col): (u8, u8)| -> LuaResult<f32> {
             matrix.check_bounds(row, col)?;
 
@@ -523,7 +521,7 @@ impl UserData for ModelMatrix {
         methods.add_function(
             "toBytes",
             |_, (_, matrix): (AnyUserData, AnyUserData)| -> LuaResult<Vec<u8>> {
-                let matrix: Ref<ModelMatrix> = matrix.borrow()?;
+                let matrix: UserDataRef<ModelMatrix> = matrix.borrow()?;
 
                 matrix.with_matrix(|matrix| {
                     let mut bytes = Vec::<u8>::new();

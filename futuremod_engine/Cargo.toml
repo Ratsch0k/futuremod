@@ -37,10 +37,11 @@ walkdir = "2.4.0"
 zip = "0.6.6"
 junction = "1.2.0"
 directories = "5.0.1"
+uuid = { version = "1.11.0", features = ["serde", "v4"] }
 
 [dependencies.mlua]
-version = "0.9.1"
-features = ["luau", "async", "serialize", "unstable"]
+version = "0.10.0"
+features = ["luau", "async", "serialize"]
 
 [dependencies.windows]
 version = "0.*"

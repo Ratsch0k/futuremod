@@ -3,9 +3,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use mlua::{Lua, OwnedTable};
+use mlua::{Lua, Table};
 
-pub fn create_system_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
+pub fn create_system_library(lua: Arc<Lua>) -> Result<Table, mlua::Error> {
     let library = lua.create_table()?;
 
     let get_time_fn = lua.create_function(|_, ()| {
@@ -21,5 +21,5 @@ pub fn create_system_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
     })?;
     library.set("getTime", get_time_fn)?;
 
-    Ok(library.into_owned())
+    Ok(library)
 }

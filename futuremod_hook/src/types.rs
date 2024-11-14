@@ -37,11 +37,11 @@ impl Type {
 pub const MAX_STRING: u16 = 1024;
 
 /// Convert a native value into its lua value given the type name.
-pub unsafe fn native_to_lua<'a>(
-    lua: &'a Lua,
+pub unsafe fn native_to_lua(
+    lua: &Lua,
     lua_type: Type,
     raw_value: u32,
-) -> Result<mlua::Value<'a>, mlua::Error> {
+) -> Result<mlua::Value, mlua::Error> {
     let value = match lua_type {
         Type::String => {
             let mut string_bytes: Vec<u8> = Vec::new();

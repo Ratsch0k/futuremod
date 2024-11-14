@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use mlua::{Lua, LuaSerdeExt, OwnedTable, Value};
+use mlua::{Lua, LuaSerdeExt, Table, Value};
 
 use crate::api::{
     self,
     ui::{Color, TextPalette, TEXT_PALETTES},
 };
 
-pub fn create_ui_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
+pub fn create_ui_library(lua: Arc<Lua>) -> Result<Table, mlua::Error> {
     let library = lua.create_table()?;
 
     let render_text = lua.create_function(
@@ -43,5 +43,5 @@ pub fn create_ui_library(lua: Arc<Lua>) -> Result<OwnedTable, mlua::Error> {
         library.set(format!("Palette{}", palette), Into::<u32>::into(palette))?;
     }
 
-    Ok(library.into_owned())
+    Ok(library)
 }

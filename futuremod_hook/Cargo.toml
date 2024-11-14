@@ -27,5 +27,5 @@ features = [
 ]
 
 [dependencies.mlua]
-version = "0.9.1"
-features = ["luau", "async", "serialize", "unstable"]
+version = "0.10.0"
+features = ["luau", "async", "serialize"]

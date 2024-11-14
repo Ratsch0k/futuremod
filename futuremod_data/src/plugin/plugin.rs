@@ -12,6 +12,7 @@ pub enum PluginDependency {
     UI,
     System,
     Matrix,
+    Settings,
 
     // The following libraries are from the standard library
     Math,
@@ -35,6 +36,7 @@ impl Display for PluginDependency {
             PluginDependency::String => f.write_str("String"),
             PluginDependency::Utf8 => f.write_str("Utf8"),
             PluginDependency::Matrix => f.write_str("Matrix"),
+            PluginDependency::Settings => f.write_str("Settings"),
         }
     }
 }

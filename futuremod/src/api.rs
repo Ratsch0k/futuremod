@@ -4,11 +4,11 @@ use crate::config;
 use anyhow::{anyhow, bail};
 use log::info;
 use reqwest::Body;
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::fs;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-use futuremod_data::plugin::{Plugin, PluginInfo};
+use futuremod_data::plugin::{settings::{Event, PluginSettings, SettingsEvent}, Plugin, PluginInfo};
 
 pub fn build_url(path: &str) -> String {
     let config = config::get();
@@ -232,6 +232,66 @@ pub async fn disable_plugin(name: String) -> Result<(), anyhow::Error> {
             .map_err(|e| anyhow!("Could not get response content: {}", e))?;
 
         bail!("{}", response_text)
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PluginByName {
+    pub name: String,
+}
+
+
+pub async fn get_plugin_settings(name: String) -> Result<PluginSettings, anyhow::Error> {
+    let body = PluginByName {
+        name,
+    };
+
+    let response = reqwest::Client::new()
+        .put(build_url("/plugin/settings"))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| anyhow!("Could not send request to get settings: {}", e))?;
+
+    if !response.status().is_success() {
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| anyhow!("Could nto get response content: {}", e))?;
+
+        bail!("{}", response_text);
+    }
+
+    response
+        .json()
+        .await
+        .map_err(|e| anyhow!("Plugin settings has unexpected format: {}", e))
+}
+
+pub async fn send_settings_event(name: String, id: String, event: Event) -> Result<(), anyhow::Error> {
+    let body = SettingsEvent {
+        name,
+        event,
+        target_id: id,
+    };
+
+    let response = reqwest::Client::new()
+        .put(build_url("/plugin/settings/event"))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| anyhow!("Could not send request for settings event: {}", e))?;
+
+    if !response.status().is_success() {
+        let response_text = response
+            .text()
+            .await
+
+            .map_err(|e| anyhow!("Could not get response content: {}", e))?;
+
+        bail!("{}", response_text);
     }
 
     Ok(())

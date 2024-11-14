@@ -1,4 +1,4 @@
-mod library;
+pub mod library;
 pub mod plugin;
 mod plugin_environment;
 pub mod plugin_info;

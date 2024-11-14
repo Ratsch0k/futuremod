@@ -1,6 +1,6 @@
 use futuremod_hook::types::{Type, MAX_STRING};
 use log::debug;
-use mlua::{AnyUserDataExt, Lua};
+use mlua::{Lua, ObjectLike};
 
 use crate::plugins::library::LuaResult;
 
@@ -15,8 +15,8 @@ fn try_userdata_to_bytes(userdata: &mlua::AnyUserData) -> LuaResult<Vec<u8>> {
 /// **Very unsafe**.
 ///
 /// Wrong usage can easily lead to a panic.
-pub fn write_memory_function<'lua>(
-    _: &'lua Lua,
+pub fn write_memory_function(
+    _: &Lua,
     (address, data): (u32, mlua::Value),
 ) -> Result<(), mlua::Error> {
     debug!("Write memory to {}, value: {:?}", address, data);
@@ -91,10 +91,10 @@ pub fn write_memory_function<'lua>(
 }
 
 /// Read any memory address and convert it to the given type in lua.
-pub fn read_memory_function<'lua>(
-    lua: &'lua Lua,
+pub fn read_memory_function(
+    lua: &Lua,
     (address, type_name): (u32, String),
-) -> Result<mlua::Value<'lua>, mlua::Error> {
+) -> Result<mlua::Value, mlua::Error> {
     debug!("Read memory address {} with type {}", address, type_name);
     let value_type = match Type::try_from_str(type_name.as_str()) {
         Some(t) => t,

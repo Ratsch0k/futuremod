@@ -2,6 +2,7 @@ pub mod dangerous;
 pub mod game;
 pub mod input;
 pub mod matrix;
+pub mod settings;
 pub mod system;
 pub mod ui;
 

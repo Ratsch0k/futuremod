@@ -1,7 +1,10 @@
-use super::plugin_environment::PluginEnvironment;
+use super::{
+    library::settings::{get_settings, PluginSettings},
+    plugin_environment::PluginEnvironment,
+};
 use futuremod_data::plugin::{PluginError, PluginInfo};
 use log::*;
-use mlua::{Function, Lua, OwnedFunction, Table};
+use mlua::{Function, Lua, Table};
 use serde::{ser::SerializeStruct, Serialize};
 use std::{fs, path::PathBuf, sync::Arc};
 
@@ -70,13 +73,13 @@ impl Into<futuremod_data::plugin::PluginState> for PluginState {
 #[derive(Debug, Clone)]
 pub struct PluginContext {
     environment: PluginEnvironment,
-    on_load: Option<OwnedFunction>,
-    on_unload: Option<OwnedFunction>,
-    on_update: Option<OwnedFunction>,
-    on_enable: Option<OwnedFunction>,
-    on_disable: Option<OwnedFunction>,
-    on_install: Option<OwnedFunction>,
-    on_uninstall: Option<OwnedFunction>,
+    on_load: Option<Function>,
+    on_unload: Option<Function>,
+    on_update: Option<Function>,
+    on_enable: Option<Function>,
+    on_disable: Option<Function>,
+    on_install: Option<Function>,
+    on_uninstall: Option<Function>,
 }
 
 impl Into<futuremod_data::plugin::PluginContext> for PluginContext {
@@ -93,7 +96,7 @@ impl Into<futuremod_data::plugin::PluginContext> for PluginContext {
     }
 }
 
-fn optional_lua_function_to_string(fun: &Option<OwnedFunction>) -> &'static str {
+fn optional_lua_function_to_string(fun: &Option<Function>) -> &'static str {
     if fun.is_some() {
         "set"
     } else {
@@ -201,13 +204,13 @@ impl Plugin {
             }
         };
 
-        let on_load = get_lua_function_or_none(&environment.table.to_ref(), "onLoad");
-        let on_unload = get_lua_function_or_none(&environment.table.to_ref(), "onUnload");
-        let on_update = get_lua_function_or_none(&environment.table.to_ref(), "onUpdate");
-        let on_enable = get_lua_function_or_none(&environment.table.to_ref(), "onEnable");
-        let on_disable = get_lua_function_or_none(&environment.table.to_ref(), "onDisable");
-        let on_install = get_lua_function_or_none(&environment.table.to_ref(), "onInstall");
-        let on_uninstall = get_lua_function_or_none(&environment.table.to_ref(), "onUninstall");
+        let on_load = get_lua_function_or_none(&environment.table, "onLoad");
+        let on_unload = get_lua_function_or_none(&environment.table, "onUnload");
+        let on_update = get_lua_function_or_none(&environment.table, "onUpdate");
+        let on_enable = get_lua_function_or_none(&environment.table, "onEnable");
+        let on_disable = get_lua_function_or_none(&environment.table, "onDisable");
+        let on_install = get_lua_function_or_none(&environment.table, "onInstall");
+        let on_uninstall = get_lua_function_or_none(&environment.table, "onUninstall");
 
         let context = PluginContext {
             environment,
@@ -222,7 +225,7 @@ impl Plugin {
 
         debug!("Execute onLoad function");
         match &context.on_load {
-            Some(main) => match main.call::<_, ()>(()) {
+            Some(main) => match main.call::<()>(()) {
                 Ok(_) => debug!("Successfully called onLoad"),
                 Err(e) => {
                     warn!("Main function threw error: {:?}", e);
@@ -375,14 +378,28 @@ impl Plugin {
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
+
+    pub fn get_settings(&self) -> Result<Option<PluginSettings>, PluginError> {
+        match &self.state {
+            PluginState::Loaded(context) => {
+                debug!("{:#?}", context.environment.libraries);
+                get_settings(&context.environment.libraries)
+                    .map_err(|e| PluginError::Error(format!("{}", e)))
+            }
+            _ => {
+                debug!("Requested plugin settings of not loaded plugin");
+                Ok(None)
+            }
+        }
+    }
 }
 
-fn get_lua_function_or_none<'lua>(module: &'lua Table, name: &str) -> Option<OwnedFunction> {
-    match module.get::<&str, Function>(name) {
+fn get_lua_function_or_none(module: &Table, name: &str) -> Option<mlua::Function> {
+    match module.get::<Function>(name) {
         Ok(function) => {
             debug!("Module {:?} has attribute '{}'", module, name);
 
-            Some(function.into_owned())
+            Some(function)
         }
         Err(_) => {
             debug!("Module {:?} has no attribute '{}'", module, name);

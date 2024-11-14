@@ -258,7 +258,9 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
             let plugin = dashboard.plugins.get(&name);
             match plugin {
                 Some(plugin) => {
-                    dashboard.view = View::Plugin(view::plugin::Plugin::new(plugin));
+                    let (view, message) = view::plugin::Plugin::new(plugin);
+                    dashboard.view = View::Plugin(view);
+                    return message.map(Message::Plugin);
                 }
                 None => {}
             }
@@ -290,12 +292,17 @@ pub fn update(dashboard: &mut Dashboard, message: Message) -> Task<Message> {
                 },
                 _ => (),
             },
-            View::Plugin(_) => match message {
+            View::Plugin(plugin_view) => match message {
                 Message::Plugin(plugin_message) => match plugin_message {
-                    view::plugin::Message::GoBack => {
-                        return Task::done(Message::ToPluginList);
+                    view::plugin::Message::GoBack => return Task::done(Message::ToPluginList),
+                    plugin_message => {
+                        if let Some(plugin) = dashboard.plugins.get(&plugin_view.name) {
+                            return plugin_view.update(plugin, plugin_message)
+                            .map(Message::Plugin);
+                        } else {
+                            warn!("Plugin view active but plugin '{}' not found", plugin_view.name);
+                        }
                     }
-                    _ => (),
                 },
                 _ => (),
             },

@@ -723,7 +723,7 @@ impl Hook {
 }
 
 impl UserData for Hook {
-    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method_mut("unhook", |_, this, ()| {
             unsafe {
                 this.unhook()

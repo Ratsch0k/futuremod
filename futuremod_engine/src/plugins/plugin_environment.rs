@@ -8,12 +8,13 @@ use std::{
 
 use super::library::{
     dangerous::create_dangerous_library, game::create_game_library, input::create_input_library,
-    matrix::create_matrix_library, system::create_system_library, ui::create_ui_library,
+    matrix::create_matrix_library, settings::create_settings_library_new,
+    system::create_system_library, ui::create_ui_library,
 };
 use anyhow::bail;
 use futuremod_data::plugin::{PluginDependency, PluginInfo};
 use log::*;
-use mlua::{Lua, OwnedTable};
+use mlua::{IntoLua, Lua, Table};
 
 /// Holds the entire plugin environment.
 ///
@@ -24,9 +25,11 @@ use mlua::{Lua, OwnedTable};
 #[derive(Clone)]
 pub struct PluginEnvironment {
     /// Plugin globals.
-    pub table: OwnedTable,
+    pub table: Table,
     /// Plugin package cache
-    package_cache: Arc<Mutex<HashMap<PathBuf, mlua::OwnedTable>>>,
+    package_cache: Arc<Mutex<HashMap<PathBuf, mlua::Table>>>,
+
+    pub libraries: Arc<HashMap<&'static str, mlua::Value>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -57,7 +60,7 @@ unsafe fn raw_to_lua<'a>(
     lua: &'a Lua,
     lua_type: Type,
     raw_value: u32,
-) -> Result<mlua::Value<'a>, mlua::Error> {
+) -> Result<mlua::Value, mlua::Error> {
     let value = match lua_type {
         Type::Integer => mlua::Value::Integer(raw_value as i32),
         Type::String => {
@@ -115,27 +118,40 @@ unsafe fn lua_to_raw<'a>(
 fn prepare_libraries(
     lua: Arc<Lua>,
     info: &PluginInfo,
-) -> Result<HashMap<&'static str, mlua::OwnedTable>, mlua::Error> {
-    let mut libraries = HashMap::new();
+) -> Result<HashMap<&'static str, mlua::Value>, mlua::Error> {
+    let mut libraries: HashMap<&'static str, mlua::Value> = HashMap::new();
 
     let globals = lua.globals();
 
     for library in info.dependencies.iter() {
         match library {
-            PluginDependency::Dangerous => {
-                libraries.insert("dangerous", create_dangerous_library(lua.clone())?)
+            PluginDependency::Dangerous => libraries.insert(
+                "dangerous",
+                mlua::Value::Table(create_dangerous_library(lua.clone())?),
+            ),
+            PluginDependency::Game => libraries.insert(
+                "game",
+                mlua::Value::Table(create_game_library(lua.clone())?),
+            ),
+            PluginDependency::Input => libraries.insert(
+                "input",
+                mlua::Value::Table(create_input_library(lua.clone())?),
+            ),
+            PluginDependency::UI => {
+                libraries.insert("ui", mlua::Value::Table(create_ui_library(lua.clone())?))
             }
-            PluginDependency::Game => libraries.insert("game", create_game_library(lua.clone())?),
-            PluginDependency::Input => {
-                libraries.insert("input", create_input_library(lua.clone())?)
-            }
-            PluginDependency::UI => libraries.insert("ui", create_ui_library(lua.clone())?),
-            PluginDependency::System => {
-                libraries.insert("system", create_system_library(lua.clone())?)
-            }
-            PluginDependency::Matrix => {
-                libraries.insert("matrix", create_matrix_library(lua.clone())?)
-            }
+            PluginDependency::System => libraries.insert(
+                "system",
+                mlua::Value::Table(create_system_library(lua.clone())?),
+            ),
+            PluginDependency::Matrix => libraries.insert(
+                "matrix",
+                mlua::Value::Table(create_matrix_library(lua.clone())?),
+            ),
+            PluginDependency::Settings => libraries.insert(
+                "settings",
+                create_settings_library_new(lua.clone())?.into_lua(&lua)?,
+            ),
             PluginDependency::Math => libraries.insert("math", globals.get("math").to_owned()?),
             PluginDependency::Bit32 => libraries.insert("bit32", globals.get("bit32").to_owned()?),
             PluginDependency::String => {
@@ -154,7 +170,7 @@ fn link_global_by_name(
     src: &mlua::Table,
     dst: &mlua::Table,
 ) -> Result<(), mlua::Error> {
-    dst.set(name, src.get::<_, mlua::Value>(name)?)
+    dst.set(name, src.get::<mlua::Value>(name)?)
 }
 
 const DEFAULT_GLOBALS: [&str; 17] = [
@@ -196,21 +212,23 @@ impl PluginEnvironment {
         // Create and set functions
         let print_target = plugin_info.name.to_string();
         let print_fn = lua.create_function(move |_, msg: mlua::Value| {
-      // Convert the message into a string.
-      // If the value cannot be converted to string, use it's debug representation
-      let msg = match msg.to_string() {
-        Ok(msg) => msg,
-        Err(_) => format!("{:?}", msg),
-      };
-      let plugin_name = print_target.clone();
+            // Convert the message into a string.
+            // If the value cannot be converted to string, use it's debug representation
+            let msg = match msg.to_string() {
+                Ok(msg) => msg,
+                Err(_) => format!("{:?}", msg),
+            };
+            let plugin_name = print_target.clone();
 
-      info!(target: format!("plugin::{}", print_target).as_str(), plugin:% = plugin_name; "{}", msg);
+            info!(target: format!("plugin::{}", print_target).as_str(), plugin:% = plugin_name; "{}", msg);
 
-      Ok(())
-    })?;
+            Ok(())
+        })?;
 
-        let libraries = prepare_libraries(lua.clone(), &plugin_info)?;
-        let package_cache: Arc<Mutex<HashMap<PathBuf, OwnedTable>>> =
+        let libraries = Arc::new(prepare_libraries(lua.clone(), &plugin_info)?);
+        let libraires_weak = Arc::downgrade(&libraries);
+
+        let package_cache: Arc<Mutex<HashMap<PathBuf, Table>>> =
             Arc::new(Mutex::new(HashMap::new()));
         let require_fn_package_cache = Arc::downgrade(&package_cache);
         let plugin_info_clone = plugin_info.clone();
@@ -219,65 +237,68 @@ impl PluginEnvironment {
         let lua_ref = lua.clone();
 
         let require_fn = lua.create_function(move |lua, name: String| {
-      debug!("Plugin '{}' required {}", plugin_name, name);
+            debug!("Plugin '{}' required {}", plugin_name, name);
 
-      // Check if a library with the given name exists
-      if let Some(library) = libraries.get(name.as_str()) {
-        debug!("Required name is a library");
-        return Ok(library.clone());
-      }
+            // Check if a library with the given name exists
+            let libraries = libraires_weak.upgrade()
+                .ok_or(mlua::Error::RuntimeError("Require is forbidden".into()))?;
 
-      debug!("Library doesn't exist, treating require statement as requiring a local file");
+            if let Some(library) = libraries.get(name.as_str()) {
+                debug!("Required name is a library");
+                return Ok(library.clone());
+            }
 
-      // Check if the require statement should load another lua file
-      // Normalize the require path such that referencing the same file with a slightly different path
-      // will not load the same file multiple times.
-      // We enforce here that every require statement of a lua file is the relative path to that file
-      // starting from the root of the plugin.
-      let require_path = Path::new(&name).to_path_buf().with_extension("lua");
+            debug!("Library doesn't exist, treating require statement as requiring a local file");
 
-      debug!("Requiring file '{:?}'", require_path);
+            // Check if the require statement should load another lua file
+            // Normalize the require path such that referencing the same file with a slightly different path
+            // will not load the same file multiple times.
+            // We enforce here that every require statement of a lua file is the relative path to that file
+            // starting from the root of the plugin.
+            let require_path = Path::new(&name).to_path_buf().with_extension("lua");
 
-      let absolute_require_path = Path::join(&plugin_path, require_path.clone()).canonicalize().map_err(|e| mlua::Error::RuntimeError(format!("Could not load library: {:?}", e)))?;
+            debug!("Requiring file '{:?}'", require_path);
 
-      let require_package_cache = match require_fn_package_cache.upgrade() {
-        Some(c) => c,
-        None => return Err(mlua::Error::RuntimeError("Require is forbidden: Plugin is destroyed".into())),
-      };
+            let absolute_require_path = Path::join(&plugin_path, require_path.clone()).canonicalize().map_err(|e| mlua::Error::RuntimeError(format!("Could not load library: {:?}", e)))?;
 
-      let mut require_package_cache = require_package_cache.lock().map_err(|e| mlua::Error::RuntimeError(format!("Couldn't get lock to cache: {:?}", e)))?;
+            let require_package_cache = match require_fn_package_cache.upgrade() {
+                Some(c) => c,
+                None => return Err(mlua::Error::RuntimeError("Require is forbidden: Plugin is destroyed".into())),
+            };
 
-      if let Some(cached_file) = require_package_cache.get(&require_path) {
-        debug!("Found required file in cache");
-        return Ok(cached_file.clone());
-      }
+            let mut require_package_cache = require_package_cache.lock().map_err(|e| mlua::Error::RuntimeError(format!("Couldn't get lock to cache: {:?}", e)))?;
 
-      if !absolute_require_path.starts_with(&plugin_path) {
-        warn!("Plugin {} required {:?} which is outside it's plugin folder", plugin_name, absolute_require_path);
-        return Err(mlua::Error::RuntimeError("Permission denied: Requiring a file outside of the plugin folder is not allowed".into()));
-      }
+            if let Some(cached_file) = require_package_cache.get(&require_path) {
+                debug!("Found required file in cache");
+                return Ok(mlua::Value::Table(cached_file.clone()));
+            }
 
-      if !absolute_require_path.exists() {
-        warn!("Plugin {} required non-existing file {:?}", plugin_name, absolute_require_path);
-        return Err(mlua::Error::RuntimeError("Required file doesn't exist".into()));
-      }
+            if !absolute_require_path.starts_with(&plugin_path) {
+                warn!("Plugin {} required {:?} which is outside it's plugin folder", plugin_name, absolute_require_path);
+                return Err(mlua::Error::RuntimeError("Permission denied: Requiring a file outside of the plugin folder is not allowed".into()));
+            }
 
-      debug!("Preparing plugin environment for required file");
-      let file_environment = PluginEnvironment::new(lua_ref.clone(), &plugin_info_clone)?;
+            if !absolute_require_path.exists() {
+                warn!("Plugin {} required non-existing file {:?}", plugin_name, absolute_require_path);
+                return Err(mlua::Error::RuntimeError("Required file doesn't exist".into()));
+            }
 
-      // Read the file content
-      let content = fs::read_to_string(&absolute_require_path).map_err(|e| mlua::Error::RuntimeError(format!("Could not require file: {:?}", e)))?;
-      let file_chunk = lua.load(content).set_environment(file_environment.table.clone());
+            debug!("Preparing plugin environment for required file");
+            let file_environment = PluginEnvironment::new(lua_ref.clone(), &plugin_info_clone)?;
 
-      debug!("Executing required file");
-      file_chunk.exec()?;
+            // Read the file content
+            let content = fs::read_to_string(&absolute_require_path).map_err(|e| mlua::Error::RuntimeError(format!("Could not require file: {:?}", e)))?;
+            let file_chunk = lua.load(content).set_environment(file_environment.table.clone());
 
-      let file_globals = file_environment.table.clone();
+            debug!("Executing required file");
+            file_chunk.exec()?;
 
-      let _ = require_package_cache.insert(absolute_require_path, file_globals.clone());
+            let file_globals = file_environment.table.clone();
 
-      Ok(file_globals)
-    })?;
+            let _ = require_package_cache.insert(absolute_require_path, file_globals.clone());
+
+            Ok(mlua::Value::Table(file_globals))
+        })?;
 
         table.set("print", print_fn)?;
         table.set("require", require_fn)?;
@@ -285,7 +306,8 @@ impl PluginEnvironment {
         add_default_globals(&table, &lua.globals())?;
 
         Ok(PluginEnvironment {
-            table: table.into_owned(),
+            table,
+            libraries,
             package_cache,
         })
     }
