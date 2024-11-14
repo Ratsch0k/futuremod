@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::{anyhow, bail};
+use futuremod_data::plugin::settings::Event;
 use log::debug;
 use mlua::UserData;
 use serde::{ser::SerializeStruct, Serialize};
@@ -24,7 +25,7 @@ pub enum ComponentBuilder {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Component {
     Button(Button),
     Section(Section),
@@ -49,6 +50,29 @@ impl Serialize for PluginSettings {
             .ok_or(serde::ser::Error::custom("Root dropped"))?;
         state.serialize_field("root", &*strong_root)?;
         state.end()
+    }
+}
+
+impl PluginSettings {
+    pub fn handle_event(&mut self, id: String, event: Event) -> Result<(), anyhow::Error> {
+        match event {
+            Event::ClickButton => {
+                let component = self.components.get(&id)
+                    .ok_or(anyhow!("No component with id '{}' exists", id))?;
+
+                if let Component::Button(button) = component.as_ref() {
+                    match &button.on_click {
+                        Some(button_callback) => {
+                            button_callback.call::<()>(())
+                                .map_err(|e| anyhow!("onClick function errored: {}", e))?;
+                        },
+                        None => bail!("Button '{}' has no onClick callback", id),
+                    }
+                }
+
+                return Ok(())
+            },
+        }
     }
 }
 

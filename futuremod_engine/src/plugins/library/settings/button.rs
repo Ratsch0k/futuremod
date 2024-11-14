@@ -14,6 +14,7 @@ pub struct ButtonBuilder {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Button {
     pub(super) text: String,
     pub(super) disabled: bool,
